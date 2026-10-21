@@ -534,14 +534,14 @@ namespace ZeroFeed.Windows
 
         private void TriggerHardTruthCallout(string sourceDescription)
         {
-            _store.StreakDays = 0;
+            _store.StreakDays = Math.Max(1, _store.StreakDays);
             _store.TodaySlips += 1;
             _store.TotalSlips += 1;
             _store.Save();
             RefreshUiFromStore();
 
             string message =
-                "CAUGHT IN THE ACT: " + sourceDescription + "\n\n" +
+                "CAUGHT & STOPPED BY ZEROFEED (Streak Protected): " + sourceDescription + "\n\n" +
                 "You just opened a short-form video or infinite feed trap. Feel the weight of wasted potential—nobody ever achieved mastery by swiping 30-second videos.\n\n" +
                 "1. Close that feed immediately.\n" +
                 "2. Pick up your book and read 25 pages.\n" +
@@ -550,7 +550,7 @@ namespace ZeroFeed.Windows
             MessageBox.Show(
                 this,
                 message,
-                "ZEROFEED — HARD-TRUTH ACCOUNTABILITY INTERCEPT",
+                "ZEROFEED — HARD-TRUTH ACCOUNTABILITY INTERCEPT (STREAK INTACT)",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Warning
             );

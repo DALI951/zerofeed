@@ -46,10 +46,10 @@
     document.getElementById("problemReminder").textContent = callout.problemSolvingReminder;
     document.getElementById("adviceBanner").innerHTML = `<strong>Advice of the Day:</strong> ${callout.dailyAdvice}`;
 
-    const slipsToday = (cfg.streak && cfg.streak.todaySlipsDetected) || 1;
-    const totalSlips = (cfg.streak && cfg.streak.totalSlipsDetected) || 1;
+    const streakDays = (cfg.streak && cfg.streak.currentDays) || 1;
+    const deflectedToday = (cfg.streak && cfg.streak.todaySlipsDetected) || 1;
     document.getElementById("slipCounter").textContent =
-      `Slips Detected Today: ${slipsToday} (Total: ${totalSlips}) | Clean Streak Reset to 0d`;
+      `Streak Intact: ${streakDays} Day(s) Clean | Distractions Blocked Today: ${deflectedToday}`;
 
     const listEl = document.getElementById("pendingPlansList");
     listEl.innerHTML = "";

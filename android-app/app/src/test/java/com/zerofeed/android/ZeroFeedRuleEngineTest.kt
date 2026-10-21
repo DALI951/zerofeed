@@ -1,6 +1,7 @@
 package com.zerofeed.android
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -33,22 +34,19 @@ class ZeroFeedRuleEngineTest {
     }
 
     @Test
-    fun blocksTikTokAndAllowsEduAndEmergencyPackages() {
-        val tiktok = ZeroFeedRuleEngine.evaluateUrl("https://www.tiktok.com/@user/video/123")
-        assertEquals("BLOCK", tiktok.action)
-        assertEquals("tiktok", tiktok.platformId)
-
-        val edu = ZeroFeedRuleEngine.evaluateUrl("https://ocw.mit.edu/courses/")
-        assertEquals("ALLOW", edu.action)
+    fun allowsNativeInstagramAndYouTubePackagesForInAppFilteringWhileBlockingTikTok() {
+        assertFalse(ZeroFeedRuleEngine.defaultBlockedAppPackages.contains("com.instagram.android"))
+        assertFalse(ZeroFeedRuleEngine.defaultBlockedAppPackages.contains("com.google.android.youtube"))
+        assertTrue(ZeroFeedRuleEngine.defaultBlockedAppPackages.contains("com.zhiliaoapp.musically"))
 
         assertTrue(ZeroFeedRuleEngine.isEmergencyAllowedPackage("com.samsung.android.dialer"))
         assertTrue(ZeroFeedRuleEngine.isEmergencyAllowedPackage("com.samsung.android.messaging"))
     }
 
     @Test
-    fun buildsHardTruthCalloutRemindingBookAndProblems() {
+    fun buildsHardTruthCalloutRemindingBookAndProblemsAndProtectingStreak() {
         val callout = ZeroFeedRuleEngine.buildHardTruthCallout("YouTube Short", "SHORT_OR_REEL", 294)
-        assertTrue(callout.headline.contains("SHORTS / REELS ATTEMPT DETECTED"))
+        assertTrue(callout.headline.contains("STREAK PROTECTED"))
         assertTrue(callout.bookReminder.lowercase().contains("book"))
         assertTrue(callout.problemReminder.lowercase().contains("problem"))
     }

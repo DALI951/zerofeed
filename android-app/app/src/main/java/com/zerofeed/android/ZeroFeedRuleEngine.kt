@@ -33,13 +33,12 @@ object ZeroFeedRuleEngine {
         "com.sec.android.app.launcher"
     )
 
+    // Note: com.instagram.android and com.google.android.youtube are NOT full-app blocked!
+    // Instead, ZeroFeedAccessibilityService modifies/guards them IN-APP (hiding feed, quitting Reels/Shorts, preserving DMs & Search).
     val defaultBlockedAppPackages = setOf(
         "com.zhiliaoapp.musically",     // TikTok
         "com.ss.android.ugc.trill",     // TikTok regional
-        "com.instagram.android",        // Native Instagram (redirected to ZEROFEED IG Direct Mode)
-        "com.reddit.frontpage",         // Reddit native feed
-        "com.twitter.android",          // X / Twitter native feed
-        "com.snapchat.android"          // Snapchat Spotlight
+        "com.snapchat.android"          // Snapchat
     )
 
     private val globalAllowDomains = listOf(
@@ -154,8 +153,6 @@ object ZeroFeedRuleEngine {
 
     fun isScheduleActive(hourOfDay: Int, minute: Int): Boolean {
         val currentMinutes = hourOfDay * 60 + minute
-        // Morning Deep Work: 08:00 (480) - 13:00 (780)
-        // Evening Study & Reading: 18:00 (1080) - 23:30 (1410)
         val inMorning = currentMinutes in 480 until 780
         val inEvening = currentMinutes in 1080 until 1410
         return inMorning || inEvening
@@ -168,12 +165,12 @@ object ZeroFeedRuleEngine {
 
     fun buildHardTruthCallout(sourceName: String, violationType: String, dayOfYear: Int): HardTruthCallout {
         val headline = if (violationType == "SHORT_OR_REEL") {
-            "SHORTS / REELS ATTEMPT DETECTED ($sourceName)"
+            "SHORTS / REELS QUIT & BLOCKED ($sourceName) — STREAK PROTECTED"
         } else {
-            "INFINITE FEED ATTEMPT DETECTED ($sourceName)"
+            "INFINITE FEED HIDDEN ($sourceName) — STREAK PROTECTED"
         }
         val shame =
-            "STOP. You just tried to open $sourceName. That is engineered digital junk food designed to wreck your attention span. Feel the weight of wasted potential—close this right now, pick up your book, and solve your coding problems."
+            "STOP. You just tried to open $sourceName. ZEROFEED quit that screen immediately to protect your brain. Feel the weight of wasted potential—pick up your book and read 25 pages, or go solve 3 coding problems!"
         return HardTruthCallout(
             headline = headline,
             shameMessage = shame,
@@ -185,10 +182,14 @@ object ZeroFeedRuleEngine {
 
     private fun classifyViolation(url: String, platformId: String): String {
         val lower = url.lowercase()
-        return if (platformId == "tiktok" || lower.contains("/shorts") || lower.contains("/reel") || lower.contains("/spotlight")) {
+        return if (platformId == "tiktok" || lower.ContainsShortsOrReels()) {
             "SHORT_OR_REEL"
         } else {
             "INFINITE_FEED"
         }
+    }
+
+    private fun String.ContainsShortsOrReels(): Boolean {
+        return this.contains("/shorts") || this.contains("/reel") || this.contains("/spotlight")
     }
 }

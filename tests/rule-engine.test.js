@@ -1,7 +1,5 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 
 const defaultRules = require("../common/default-rules.json");
 const engine = require("../common/rule-engine.js");
@@ -88,13 +86,11 @@ test("6. Allowed school (.edu / .ac.uk) and competitive programming websites", (
 
 test("7. Schedule activation and expiration across time boundaries", () => {
   const cfg = cloneDefaultRules();
-  // 09:30 is inside Morning Deep Work (08:00 - 13:00)
   const activeTime = new Date("2026-10-21T09:30:00");
   const activeStatus = engine.evaluateSchedules(cfg.schedules, activeTime);
   assert.equal(activeStatus.active, true);
   assert.equal(activeStatus.currentEndTime, "13:00");
 
-  // 15:00 is between Morning (08:00-13:00) and Evening (18:00-23:30)
   const inactiveTime = new Date("2026-10-21T15:00:00");
   const inactiveStatus = engine.evaluateSchedules(cfg.schedules, inactiveTime);
   assert.equal(inactiveStatus.active, false);
@@ -119,20 +115,21 @@ test("8. Rules survive serialization / application restart and enforce Strict Mo
   assert.equal(customEval.action, "BLOCK");
 });
 
-test("9. Hard-Truth Callout detects Reel/Short opening, shames compulsive act, reminds to read a book & solve problems, and updates streak", () => {
+test("9. Hard-Truth Callout detects Reel/Short opening, shames compulsive act, reminds to read a book & solve problems, and PROTECTS streak (does not count user as slipped)", () => {
   const cfg = cloneDefaultRules();
+  cfg.streak.currentDays = 5;
   const shortEval = engine.evaluateUrl("https://www.youtube.com/shorts/xyz987", cfg);
   assert.equal(shortEval.action, "BLOCK");
 
   const callout = engine.buildCalloutPayload(shortEval, cfg, new Date("2026-10-21T10:01:00Z"));
   assert.equal(callout.violationType, "SHORT_OR_REEL");
-  assert.equal(callout.headline, "SHORTS / REELS ATTEMPT DETECTED");
+  assert.match(callout.headline, /STREAK PROTECTED/);
   assert.match(callout.bookReminder, /book/i);
   assert.match(callout.problemSolvingReminder, /problem/i);
   assert.equal(callout.pendingPlans.length, 3);
 
   const updatedCfg = engine.recordSlipAndUpdateStreak(cfg, shortEval, new Date("2026-10-21T10:01:00Z"));
-  assert.equal(updatedCfg.streak.currentDays, 0);
+  assert.equal(updatedCfg.streak.currentDays, 5); // Streak stays intact!
   assert.equal(updatedCfg.streak.totalSlipsDetected, 1);
   assert.equal(updatedCfg.streak.todaySlipsDetected, 1);
 });

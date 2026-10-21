@@ -341,8 +341,8 @@
       platformName: (evaluation && evaluation.platformName) || "Blocked Feed",
       headline:
         vType === "SHORT_OR_REEL"
-          ? "SHORTS / REELS ATTEMPT DETECTED"
-          : "INFINITE FEED ATTEMPT DETECTED",
+          ? "SHORTS / REELS ATTEMPT INTERCEPTED — STREAK PROTECTED"
+          : "INFINITE FEED ATTEMPT INTERCEPTED — STREAK PROTECTED",
       shameCallout: pool[messageIndex],
       bookReminder:
         "Have you read your 25 pages today? A book builds deep neural pathways; a 30-second video erodes them.",
@@ -356,13 +356,14 @@
   }
 
   /**
-   * Records a slip attempt (opening a Reel/Short/blocked feed) and resets the clean streak.
+   * Records a blocked distraction attempt WITHOUT counting the user as slipped or resetting their Clean Streak!
+   * Because the app/extension stopped the Reel/Short before consumption, the streak stays intact.
    */
   function recordSlipAndUpdateStreak(config, evaluation, now = new Date()) {
     const updated = JSON.parse(JSON.stringify(config || {}));
     if (!updated.streak) {
       updated.streak = {
-        currentDays: 0,
+        currentDays: 1,
         cleanSinceIso: now.toISOString(),
         totalSlipsDetected: 0,
         todaySlipsDetected: 0,
@@ -370,12 +371,12 @@
         lastSlipIso: null
       };
     }
-    updated.streak.currentDays = 0;
-    updated.streak.cleanSinceIso = now.toISOString();
+    // Preserve currentDays and cleanSinceIso! Being stopped by ZEROFEED protects your streak.
+    updated.streak.currentDays = Math.max(1, updated.streak.currentDays || 1);
     updated.streak.totalSlipsDetected = (updated.streak.totalSlipsDetected || 0) + 1;
     updated.streak.todaySlipsDetected = (updated.streak.todaySlipsDetected || 0) + 1;
     updated.streak.lastSlipReason =
-      (evaluation && evaluation.reason) || "Attempted to open blocked Reel/Short/Feed";
+      (evaluation && evaluation.reason) || "Intercepted & deflected Reel/Short/Feed attempt";
     updated.streak.lastSlipIso = now.toISOString();
     return updated;
   }

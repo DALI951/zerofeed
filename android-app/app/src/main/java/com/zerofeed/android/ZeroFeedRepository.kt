@@ -5,20 +5,25 @@ import android.content.Context
 data class PlanTask(val title: String, val completed: Boolean)
 
 class ZeroFeedRepository(context: Context) {
-    private val prefs = context.getSharedPreferences("zerofeed_android_prefs", Context.MODE_PRIVATE)
+    private val prefs = context.getSharedPreferences("zerofeed_android_prefs_v2", Context.MODE_PRIVATE)
 
     fun getStreakDays(): Int = prefs.getInt("streak_days", 1)
 
-    fun getTodaySlips(): Int = prefs.getInt("today_slips", 0)
+    fun getTodaySlips(): Int = prefs.getInt("today_deflected", 0)
 
-    fun getTotalSlips(): Int = prefs.getInt("total_slips", 0)
+    fun getTotalSlips(): Int = prefs.getInt("total_deflected", 0)
 
+    /**
+     * Records that ZEROFEED intercepted and quit a Reel/Short/Feed WITHOUT counting the user as slipped!
+     * Your Clean Focus Streak stays intact when ZEROFEED stops the distraction.
+     */
     fun recordSlip(reason: String) {
+        val currentStreak = getStreakDays().coerceAtLeast(1)
         prefs.edit()
-            .putInt("streak_days", 0)
-            .putInt("today_slips", getTodaySlips() + 1)
-            .putInt("total_slips", getTotalSlips() + 1)
-            .putString("last_slip_reason", reason)
+            .putInt("streak_days", currentStreak)
+            .putInt("today_deflected", getTodaySlips() + 1)
+            .putInt("total_deflected", getTotalSlips() + 1)
+            .putString("last_intercept_reason", reason)
             .apply()
     }
 
