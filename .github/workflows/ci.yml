@@ -7,6 +7,9 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   extension-and-core-tests:
     name: Core Rule Engine & Chrome/Edge Extension
@@ -86,8 +89,50 @@ jobs:
         working-directory: android-app
         run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
 
+      - name: Rename APK for Release
+        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk ZEROFEED-Android-S23Ultra.apk
+
       - name: Upload Android APK Artifact (Galaxy S23 Ultra Ready)
         uses: actions/upload-artifact@v4
         with:
           name: zerofeed-android-apk
-          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          path: ZEROFEED-Android-S23Ultra.apk
+
+  publish-github-release:
+    name: Publish APK & Binaries to GitHub Releases
+    needs: [extension-and-core-tests, windows-companion-build, android-apk-build]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download Android APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zerofeed-android-apk
+          path: release-assets
+
+      - name: Download Windows Companion Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zerofeed-windows-companion
+          path: release-assets
+
+      - name: Download Browser Extension Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: zerofeed-browser-extension
+          path: release-assets
+
+      - name: Create or Update GitHub Release v1.0.0 with APK, EXE, and Extension ZIP
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view v1.0.0 >/dev/null 2>&1; then
+            gh release upload v1.0.0 release-assets/* --clobber
+          else
+            gh release create v1.0.0 release-assets/* \
+              --title "ZEROFEED v1.0.0 — Android APK (Galaxy S23 Ultra), Windows Companion & Browser Extension" \
+              --notes "Automated Cross-Device Release of ZEROFEED. Download **ZEROFEED-Android-S23Ultra.apk** directly onto your Samsung Galaxy S23 Ultra (Android 16 / One UI), **ZeroFeedWindows.exe** for your Windows PC/Laptop, and **zerofeed-browser-extension.zip** for Chrome & Edge."
+          fi
