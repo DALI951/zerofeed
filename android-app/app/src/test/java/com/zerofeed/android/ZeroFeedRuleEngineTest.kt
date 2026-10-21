@@ -50,4 +50,12 @@ class ZeroFeedRuleEngineTest {
         assertTrue(callout.bookReminder.lowercase().contains("book"))
         assertTrue(callout.problemReminder.lowercase().contains("problem"))
     }
+
+    @Test
+    fun comparesSemanticVersionsCorrectlyForGithubAutoUpdater() {
+        assertTrue(ZeroFeedAutoUpdater.isRemoteVersionNewer("1.0.0", "v2.0.0"))
+        assertTrue(ZeroFeedAutoUpdater.isRemoteVersionNewer("2.0.0", "v2.0.4"))
+        assertFalse(ZeroFeedAutoUpdater.isRemoteVersionNewer("2.0.4", "v2.0.4"))
+        assertFalse(ZeroFeedAutoUpdater.isRemoteVersionNewer("2.1.0", "v2.0.9"))
+    }
 }

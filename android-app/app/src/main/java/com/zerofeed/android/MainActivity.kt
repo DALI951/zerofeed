@@ -3,11 +3,9 @@ package com.zerofeed.android
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
-import android.provider.Settings
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.activity.BackEventCompat
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -37,6 +35,7 @@ class MainActivity : ComponentActivity() {
     private var interceptSourceState by mutableStateOf<String?>(null)
     private var interceptViolationState by mutableStateOf("SHORT_OR_REEL")
     private var requestedTabState by mutableIntStateOf(0)
+    private var resumeTriggerTick by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -54,6 +53,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 ZeroFeedAndroidApp(
                     initialTab = requestedTabState,
+                    resumeTick = resumeTriggerTick,
                     interceptSource = interceptSourceState,
                     interceptViolationType = interceptViolationState,
                     onDismissIntercept = { interceptSourceState = null },
@@ -65,6 +65,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-check permissions automatically whenever user returns from Android Settings
+        resumeTriggerTick += 1
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -90,6 +96,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun ZeroFeedAndroidApp(
     initialTab: Int,
+    resumeTick: Int,
     interceptSource: String?,
     interceptViolationType: String,
     onDismissIntercept: () -> Unit,
@@ -106,19 +113,125 @@ fun ZeroFeedAndroidApp(
     var adviceOffset by remember { mutableIntStateOf(0) }
     var strictLocked by remember { mutableStateOf(repo.isStrictLocked()) }
 
+    // Permission states (auto-refreshed on startup and onResume)
+    var accessibilityEnabled by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
+    var overlayGranted by remember { mutableStateOf(PermissionHelper.canDrawOverlays(context)) }
+    var showPermissionDialog by remember { mutableStateOf(!accessibilityEnabled || !overlayGranted) }
+
+    // Auto-Updater states
+    var updateInfo by remember { mutableStateOf<ReleaseUpdateInfo?>(null) }
+    var updateStatusText by remember { mutableStateOf("Checking GitHub Releases for updates...") }
+    var downloadProgress by remember { mutableIntStateOf(-1) }
+
     fun syncState() {
         streakDays = repo.getStreakDays()
         todayDeflected = repo.getTodaySlips()
         totalDeflected = repo.getTotalSlips()
         plans = repo.getPlans()
         strictLocked = repo.isStrictLocked()
+        accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
+        overlayGranted = PermissionHelper.canDrawOverlays(context)
     }
 
-    LaunchedEffect(interceptSource) {
+    fun checkForGithubUpdates() {
+        updateStatusText = "Checking GitHub Releases..."
+        ZeroFeedAutoUpdater.checkLatestRelease(context) { result ->
+            result.onSuccess { info ->
+                updateInfo = info
+                updateStatusText = if (info.isNewerAvailable) {
+                    "NEW UPDATE AVAILABLE: ${info.latestTag} (Installed: v${info.currentVersion})"
+                } else {
+                    "Up to date! Installed: v${info.currentVersion} (Latest GitHub Release: ${info.latestTag})"
+                }
+            }.onFailure { err ->
+                updateStatusText = "Update check note: ${err.message}"
+            }
+        }
+    }
+
+    LaunchedEffect(resumeTick, interceptSource) {
         syncState()
+        if (!accessibilityEnabled || !overlayGranted) {
+            showPermissionDialog = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        checkForGithubUpdates()
     }
 
     val dayOfYear = remember { Calendar.getInstance().get(Calendar.DAY_OF_YEAR) }
+
+    // Automatic Startup Permission Setup Modal when Accessibility or Overlay permission is missing
+    if (showPermissionDialog && (!accessibilityEnabled || !overlayGranted)) {
+        AlertDialog(
+            onDismissRequest = { showPermissionDialog = false },
+            containerColor = Color(0xFF111724),
+            titleContentColor = Color(0xFF38BDF8),
+            textContentColor = Color.White,
+            title = {
+                Text(
+                    "Permissions Needed to Close Reels/Shorts & Hide Feeds",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 17.sp
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "To quit Reels/Shorts inside your real Instagram & YouTube apps and cover their home feeds, grant these 2 permissions:",
+                        fontSize = 13.sp,
+                        color = Color(0xFFCBD5E1)
+                    )
+                    Text(
+                        "• Samsung One UI Tip: If Accessibility is grayed out ('Restricted setting'), tap Step 1 first → tap ⋮ (top-right) → 'Allow restricted settings'.",
+                        fontSize = 12.sp,
+                        color = Color(0xFFFBBF24)
+                    )
+                    Button(
+                        onClick = { PermissionHelper.openAppDetailsSettings(context) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("1. Open App Info (Allow Restricted Settings)", color = Color.White, fontSize = 12.sp)
+                    }
+                    Button(
+                        onClick = { PermissionHelper.openOverlayPermissionSettings(context) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (overlayGranted) Color(0xFF22C55E) else Color(0xFF38BDF8)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (overlayGranted) "✓ 2. Appear on Top (Granted)" else "2. Grant 'Appear on Top' (Hide Feeds)",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Button(
+                        onClick = { PermissionHelper.openAccessibilitySettings(context) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (accessibilityEnabled) Color(0xFF22C55E) else Color(0xFFEF4444)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            if (accessibilityEnabled) "✓ 3. Accessibility Guard (Enabled)" else "3. Turn On Accessibility Guard (Quit Reels/Shorts)",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPermissionDialog = false }) {
+                    Text("Continue to App", color = Color(0xFF38BDF8))
+                }
+            }
+        )
+    }
 
     // If a Reel, Short, or Blocked Feed was just intercepted, show the Hard-Truth Accountability Callout Screen
     if (interceptSource != null) {
@@ -141,14 +254,12 @@ fun ZeroFeedAndroidApp(
         return
     }
 
-    // Tabs 1 (Instagram DMs) and 2 (YouTube) run in 100% FULL-SCREEN NATIVE-LOOK MODE (no ZEROFEED chrome/bars)
-    // so you feel like you are inside the original app with only the bad parts (Reels, Shorts, Home Feed) stripped!
+    // Tabs 1 (Instagram DMs) and 2 (YouTube) run in 100% FULL-SCREEN NATIVE-LOOK MODE
     if (selectedTab == 1) {
         SeamlessNativeLookExperience(
             backgroundColor = Color(0xFF000000),
             initialUrl = "https://www.instagram.com/direct/inbox/",
             injectedCss = """
-                /* Strip Instagram Feed, Explore, Reels, and bottom/side navigation to non-DM tabs */
                 a[href='/'], a[href='/explore/'], a[href*='/reels/'], a[href*='/reel/'],
                 svg[aria-label='Explore'], svg[aria-label='Reels'], svg[aria-label='Home'],
                 div[role='tablist'] a:not([href*='direct']) {
@@ -177,7 +288,6 @@ fun ZeroFeedAndroidApp(
             backgroundColor = Color(0xFF0F0F0F),
             initialUrl = "https://m.youtube.com",
             injectedCss = """
-                /* Preserve YouTube top Search Bar & Video Player while stripping Home Feed and all Shorts */
                 ytm-reel-shelf-renderer, ytd-reel-shelf-renderer,
                 ytm-shorts-lockup-view-model, ytm-rich-section-renderer,
                 a[href^='/shorts'], a[href*='/shorts/'],
@@ -189,7 +299,6 @@ fun ZeroFeedAndroidApp(
                     visibility: hidden !important;
                     pointer-events: none !important;
                 }
-                /* Keep top search header prominent and native dark */
                 ytm-mobile-topbar-renderer, header {
                     display: flex !important;
                     visibility: visible !important;
@@ -198,7 +307,6 @@ fun ZeroFeedAndroidApp(
             """.trimIndent(),
             injectedJs = """
                 (function() {
-                    // Add subtle native-styled search prompt on empty Home screen so Search Bar at top is the sole focus
                     if (window.location.pathname === '/' && !document.getElementById('zf-yt-clean-home')) {
                         var msg = document.createElement('div');
                         msg.id = 'zf-yt-clean-home';
@@ -244,6 +352,31 @@ fun ZeroFeedAndroidApp(
                     streakDays = streakDays,
                     todayDeflected = todayDeflected,
                     totalDeflected = totalDeflected,
+                    accessibilityEnabled = accessibilityEnabled,
+                    overlayGranted = overlayGranted,
+                    onOpenPermissionSetup = { showPermissionDialog = true },
+                    updateInfo = updateInfo,
+                    updateStatusText = updateStatusText,
+                    downloadProgress = downloadProgress,
+                    onCheckUpdates = { checkForGithubUpdates() },
+                    onInstallUpdate = {
+                        val url = updateInfo?.apkDownloadUrl
+                            ?: "https://github.com/DALI951/zerofeed/releases/latest/download/ZEROFEED-Android-S23Ultra.apk"
+                        downloadProgress = 0
+                        updateStatusText = "Downloading latest APK from GitHub Releases..."
+                        ZeroFeedAutoUpdater.downloadAndInstallApk(
+                            context = context,
+                            apkUrl = url,
+                            onProgress = { pct ->
+                                downloadProgress = pct
+                                updateStatusText = "Downloading APK update: $pct%"
+                            },
+                            onError = { err ->
+                                downloadProgress = -1
+                                updateStatusText = err
+                            }
+                        )
+                    },
                     advice = ZeroFeedRuleEngine.getAdviceOfTheDay(dayOfYear, adviceOffset),
                     onNextAdvice = { adviceOffset += 1 },
                     plans = plans,
@@ -275,10 +408,6 @@ fun ZeroFeedAndroidApp(
     }
 }
 
-/**
- * Full-screen edge-to-edge native-look experience for Instagram Direct & Clean YouTube.
- * No ZEROFEED top bar or bottom bar is shown, so it feels 100% like the original app with only the feed/Shorts removed.
- */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun SeamlessNativeLookExperience(
@@ -332,7 +461,6 @@ fun SeamlessNativeLookExperience(
                             val target = request?.url?.toString() ?: return false
                             val verdict = ZeroFeedRuleEngine.evaluateUrl(target)
                             if (verdict.action == "BLOCK") {
-                                // Quit the Short/Reel/Feed immediately and show the Hard-Truth Callout without breaking streak
                                 onBlockedNavigation(target, verdict.violationType)
                                 return true
                             }
@@ -362,7 +490,6 @@ fun SeamlessNativeLookExperience(
             }
         )
 
-        // Subtle floating pill in bottom-left corner to return to ZEROFEED Home when desired
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -471,6 +598,14 @@ fun HomeDashboardTab(
     streakDays: Int,
     todayDeflected: Int,
     totalDeflected: Int,
+    accessibilityEnabled: Boolean,
+    overlayGranted: Boolean,
+    onOpenPermissionSetup: () -> Unit,
+    updateInfo: ReleaseUpdateInfo?,
+    updateStatusText: String,
+    downloadProgress: Int,
+    onCheckUpdates: () -> Unit,
+    onInstallUpdate: () -> Unit,
     advice: String,
     onNextAdvice: () -> Unit,
     plans: List<PlanTask>,
@@ -482,7 +617,6 @@ fun HomeDashboardTab(
     onOpenCleanYouTube: () -> Unit,
     onSimulateReelAttempt: () -> Unit
 ) {
-    val context = LocalContext.current
     var newPlanText by remember { mutableStateOf("") }
 
     Column(
@@ -492,17 +626,95 @@ fun HomeDashboardTab(
             .padding(18.dp)
     ) {
         Text(
-            text = "ZEROFEED // GALAXY S23 ULTRA",
+            text = "ZEROFEED v2.0 // GALAXY S23 ULTRA",
             color = Color(0xFF38BDF8),
             fontSize = 18.sp,
             fontWeight = FontWeight.ExtraBold
         )
         Text(
-            text = "In-App Guard Active: Modifies Instagram & YouTube in-place (quits Reels/Shorts, hides Home Feed, keeps DMs & Search).",
+            text = "In-App Guard: Quits Reels/Shorts & hides Home Feed inside Instagram and YouTube while keeping DMs & Search.",
             color = Color(0xFF94A3B8),
             fontSize = 12.sp
         )
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Live Permission Status Banner (Prompts immediately if missing!)
+        CardSection(title = "IN-APP REEL/SHORT BLOCKER PERMISSIONS") {
+            val allGranted = accessibilityEnabled && overlayGranted
+            Text(
+                text = if (allGranted) {
+                    "✓ ALL PERMISSIONS ACTIVE — Native Instagram & YouTube are actively guarded!"
+                } else {
+                    "⚠ PERMISSION REQUIRED — Enable Accessibility & Overlay below so ZEROFEED can close Reels/Shorts and hide feeds:"
+                },
+                color = if (allGranted) Color(0xFF86EFAC) else Color(0xFFFCA5A5),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "• Accessibility Guard (Quits Reels/Shorts): ${if (accessibilityEnabled) "ENABLED ✓" else "DISABLED ✗"}\n" +
+                    "• Appear on Top Overlay (Hides Home Feed): ${if (overlayGranted) "GRANTED ✓" else "MISSING ✗"}",
+                color = Color(0xFFCBD5E1),
+                fontSize = 12.sp
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onOpenPermissionSetup,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (allGranted) Color(0xFF1E293B) else Color(0xFFEF4444)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    if (allGranted) "Review Permission Diagnostics" else "Grant Permissions Now (Required to Block Reels/Shorts)",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.5.sp
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // GitHub Release Auto-Updater Card
+        CardSection(title = "GITHUB RELEASE AUTO-UPDATER") {
+            Text(
+                text = updateStatusText,
+                color = if (updateInfo?.isNewerAvailable == true) Color(0xFF86EFAC) else Color(0xFFBAE6FD),
+                fontSize = 12.5.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+            if (downloadProgress in 0..100) {
+                Spacer(modifier = Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { downloadProgress / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Color(0xFF38BDF8)
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(
+                    onClick = onCheckUpdates,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Check GitHub", color = Color(0xFF38BDF8), fontSize = 12.sp)
+                }
+                Button(
+                    onClick = onInstallUpdate,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        if (updateInfo?.isNewerAvailable == true) "Install Update (${updateInfo.latestTag})" else "Download & Install Latest APK",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.5.sp
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
 
         // Quick Launchers for Clean Instagram & Clean YouTube
         CardSection(title = "CLEAN APPS (ORIGINAL LOOK — BAD PARTS STRIPPED)") {
@@ -522,16 +734,10 @@ fun HomeDashboardTab(
                     Text("YouTube (Search Only)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "Tip: With Accessibility Guard enabled below, opening your native Instagram or YouTube app also automatically quits Reels/Shorts and shields the home feed while keeping the YouTube Search Bar and Instagram DMs!",
-                color = Color(0xFF94A3B8),
-                fontSize = 11.5.sp
-            )
         }
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Streak & Deflected Count (Never counts you as slipped when stopped!)
+        // Streak & Deflected Count
         CardSection(title = "CLEAN FOCUS STREAK (PROTECTED BY SHIELD)") {
             Text(
                 text = "$streakDays ${if (streakDays == 1) "Day" else "Days"} Clean Streak",
@@ -597,32 +803,19 @@ fun HomeDashboardTab(
         }
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Strict Mode & Accessibility Guard Setup
-        CardSection(title = "IN-APP ACCESSIBILITY GUARD & STRICT MODE") {
-            Text(
-                text = if (strictLocked) "STRICT MODE LOCKED — Settings cannot be weakened." else "Enable Accessibility Guard so ZEROFEED modifies your native Instagram & YouTube apps in-place.",
-                color = Color(0xFFFBBF24),
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+        // Strict Mode & Callout Preview
+        CardSection(title = "STRICT MODE & ACCOUNTABILITY TEST") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                }) {
-                    Text("Enable In-App Guard", fontSize = 12.sp)
+                OutlinedButton(onClick = onEngageStrictLock, modifier = Modifier.weight(1f)) {
+                    Text(if (strictLocked) "Strict Mode Locked" else "Lock Strict Mode (2h)", fontSize = 12.sp)
                 }
-                OutlinedButton(onClick = onEngageStrictLock) {
-                    Text("Lock Strict Mode (2h)", fontSize = 12.sp)
+                Button(
+                    onClick = onSimulateReelAttempt,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Preview Callout", color = Color.White, fontSize = 12.sp)
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onSimulateReelAttempt,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Preview Hard-Truth Callout (Does Not Break Streak)", color = Color.White, fontSize = 12.sp)
             }
         }
     }

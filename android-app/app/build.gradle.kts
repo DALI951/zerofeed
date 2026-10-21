@@ -4,6 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val ciVersionCode = (project.findProperty("ciVersionCode") as? String)?.toIntOrNull() ?: 200
+val ciVersionName = (project.findProperty("ciVersionName") as? String) ?: "2.0.0"
+
 android {
     namespace = "com.zerofeed.android"
     compileSdk = 35
@@ -12,8 +15,8 @@ android {
         applicationId = "com.zerofeed.android"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = ciVersionCode
+        versionName = ciVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

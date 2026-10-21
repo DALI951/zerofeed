@@ -87,16 +87,20 @@ jobs:
 
       - name: Run Android Kotlin JUnit Tests & Assemble APK
         working-directory: android-app
-        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest assembleDebug -PciVersionCode=20${{ github.run_number }} -PciVersionName=2.0.${{ github.run_number }} --no-daemon
 
-      - name: Rename APK for Release
-        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk ZEROFEED-Android-S23Ultra.apk
+      - name: Prepare APK Assets for Release
+        run: |
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk ZEROFEED-Android-S23Ultra.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk app-debug.apk
 
       - name: Upload Android APK Artifact (Galaxy S23 Ultra Ready)
         uses: actions/upload-artifact@v4
         with:
           name: zerofeed-android-apk
-          path: ZEROFEED-Android-S23Ultra.apk
+          path: |
+            ZEROFEED-Android-S23Ultra.apk
+            app-debug.apk
 
   publish-github-release:
     name: Publish APK & Binaries to GitHub Releases
@@ -125,14 +129,17 @@ jobs:
           name: zerofeed-browser-extension
           path: release-assets
 
-      - name: Create or Update GitHub Release v1.0.0 with APK, EXE, and Extension ZIP
+      - name: Publish New Versioned Release (v2.0.X) to GitHub Releases
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view v1.0.0 >/dev/null 2>&1; then
-            gh release upload v1.0.0 release-assets/* --clobber
-          else
-            gh release create v1.0.0 release-assets/* \
-              --title "ZEROFEED v1.0.0 — Android APK (Galaxy S23 Ultra), Windows Companion & Browser Extension" \
-              --notes "Automated Cross-Device Release of ZEROFEED. Download **ZEROFEED-Android-S23Ultra.apk** directly onto your Samsung Galaxy S23 Ultra (Android 16 / One UI), **ZeroFeedWindows.exe** for your Windows PC/Laptop, and **zerofeed-browser-extension.zip** for Chrome & Edge."
-          fi
+          TAG="v2.0.${{ github.run_number }}"
+          gh release create "$TAG" release-assets/* \
+            --latest \
+            --title "ZEROFEED $TAG — In-App Instagram/YouTube Guard, Auto-Updater, Custom Icon & Permissions" \
+            --notes "### ZEROFEED $TAG (Galaxy S23 Ultra / Android 16 / Windows / Chrome & Edge)
+          - **Direct Android APK**: Download **ZEROFEED-Android-S23Ultra.apk** (or **app-debug.apk**) below.
+          - **In-App Auto-Updater**: Checks GitHub Releases automatically and downloads/installs newer APKs right inside the app.
+          - **Automatic Startup Permission Prompt**: Prompts on launch for Accessibility Guard (to quit Reels/Shorts) and Appear on Top Overlay (to cover Home Feeds while keeping the YouTube Search Bar and Instagram DMs accessible).
+          - **Custom ZEROFEED Shield App Icon**: Adaptive vector launcher icon for One UI.
+          - **Streak Protection**: Never counts you as slipped when ZEROFEED stops a Reel or Short."
