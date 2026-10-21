@@ -28,7 +28,10 @@ object ZeroFeedAutoUpdater {
         "https://github.com/DALI951/zerofeed/releases/latest/download/ZEROFEED-Android-S23Ultra.apk"
 
     private val executor = Executors.newSingleThreadExecutor()
-    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun postToMain(action: () -> Unit) {
+        Handler(Looper.getMainLooper()).post(action)
+    }
 
     fun getInstalledVersionName(context: Context): String {
         return try {
@@ -101,9 +104,9 @@ object ZeroFeedAutoUpdater {
                     apkDownloadUrl = apkUrl,
                     releaseNotes = notes
                 )
-                mainHandler.post { onResult(Result.success(info)) }
+                postToMain { onResult(Result.success(info)) }
             } catch (e: Exception) {
-                mainHandler.post { onResult(Result.failure(e)) }
+                postToMain { onResult(Result.failure(e)) }
             }
         }
     }
@@ -162,19 +165,19 @@ object ZeroFeedAutoUpdater {
                             val pct = ((downloaded * 100L) / totalBytes).toInt().coerceIn(0, 100)
                             if (pct != lastReported) {
                                 lastReported = pct
-                                mainHandler.post { onProgress(pct) }
+                                postToMain { onProgress(pct) }
                             }
                         }
                         output.flush()
                     }
                 }
 
-                mainHandler.post {
+                postToMain {
                     onProgress(100)
                     launchPackageInstaller(context, outFile, onError)
                 }
             } catch (e: Exception) {
-                mainHandler.post {
+                postToMain {
                     onError("Update download failed: ${e.message}")
                 }
             }
