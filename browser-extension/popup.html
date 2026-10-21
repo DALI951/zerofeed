@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ZEROFEED Popup</title>
+  <style>
+    body {
+      width: 350px;
+      background: #0a0e17;
+      color: #f1f5f9;
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #1e293b;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .header h1 {
+      font-size: 15px;
+      margin: 0;
+      letter-spacing: 0.8px;
+      color: #38bdf8;
+    }
+    .badge {
+      background: rgba(34, 197, 94, 0.16);
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 10.5px;
+      font-weight: 700;
+    }
+    .stat-box {
+      background: #131b2e;
+      border: 1px solid #24324f;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 10px;
+    }
+    .stat-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+    .stat-val {
+      font-size: 20px;
+      font-weight: 800;
+    }
+    .advice {
+      font-size: 12.5px;
+      line-height: 1.45;
+      color: #cbd5e1;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      text-align: center;
+      padding: 9px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      margin-top: 8px;
+      text-decoration: none;
+      box-sizing: border-box;
+    }
+    .btn-primary {
+      background: #38bdf8;
+      color: #080c14;
+    }
+    .btn-secondary {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid #334155;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>ZEROFEED</h1>
+    <span class="badge">SHIELD ACTIVE</span>
+  </div>
+
+  <div class="stat-box">
+    <div class="stat-title">Clean Focus Streak</div>
+    <div id="popupStreak" class="stat-val">1 Day Clean</div>
+    <div id="popupSlips" style="font-size: 11.5px; color: #f59e0b; margin-top: 3px;">0 Reel/Short slips today</div>
+  </div>
+
+  <div class="stat-box">
+    <div class="stat-title">Advice of the Day</div>
+    <div id="popupAdvice" class="advice">Loading...</div>
+  </div>
+
+  <a class="btn btn-secondary" href="https://www.instagram.com/direct/inbox/" target="_blank" rel="noopener">
+    Open Instagram DMs Only (/direct/inbox/)
+  </a>
+  <button id="openFullDashBtn" class="btn btn-primary" type="button">
+    Open Full Home Dashboard &amp; Plans
+  </button>
+
+  <script src="popup.js"></script>
+</body>
+</html>

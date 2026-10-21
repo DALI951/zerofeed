@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZEROFEED — Control Center &amp; Home Dashboard</title>
+  <style>
+    :root {
+      --bg: #080b11;
+      --panel: #111724;
+      --panel-alt: #161f30;
+      --border: #243048;
+      --accent: #38bdf8;
+      --success: #22c55e;
+      --amber: #f59e0b;
+      --danger: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 28px;
+      line-height: 1.5;
+    }
+    .layout {
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    .brand h1 {
+      font-size: 24px;
+      letter-spacing: 1px;
+      font-weight: 800;
+    }
+    .brand p {
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .status-pill {
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      background: rgba(34, 197, 94, 0.14);
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(310px, 1fr));
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(460px, 1fr));
+      gap: 18px;
+      margin-bottom: 22px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card h2 {
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--accent);
+      margin-bottom: 12px;
+    }
+    .big-stat {
+      font-size: 34px;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+    .sub-stat {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .advice-text {
+      font-size: 14.5px;
+      color: #e2e8f0;
+      background: var(--panel-alt);
+      padding: 14px;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+      margin-bottom: 12px;
+    }
+    .plan-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      background: var(--panel-alt);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+    }
+    .plan-row label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      flex: 1;
+    }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    input[type="text"], input[type="number"], select {
+      background: #0b101b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      flex: 1;
+    }
+    button {
+      background: var(--accent);
+      color: #080d16;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: var(--panel-alt);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    button.danger {
+      background: rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      border: 1px solid var(--danger);
+    }
+    .platform-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: var(--panel-alt);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 13.5px;
+    }
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .tag {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+    .test-result {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      background: #0b101b;
+      border: 1px solid var(--border);
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <div class="brand">
+        <h1>ZEROFEED // ANTI-SCROLLING SYSTEM</h1>
+        <p>Preserve communication, education, and problem-solving. Eliminate Reels, Shorts, and infinite feeds.</p>
+      </div>
+      <div id="globalStatusPill" class="status-pill">SHIELD ACTIVE — STRICT ENFORCEMENT</div>
+    </header>
+
+    <!-- Row 1: Streak, Advice of the Day, Active Session & Schedule Summary -->
+    <div class="grid-3">
+      <div class="card">
+        <h2>Clean Focus Streak &amp; Slips</h2>
+        <div id="streakDays" class="big-stat">1 Day</div>
+        <div id="slipSummary" class="sub-stat">0 Reel/Short slips today | 0 total slips</div>
+        <div style="margin-top: 12px; font-size: 12.5px; color: var(--muted);">
+          Opening any Reel, YouTube Short, TikTok, or blocked feed triggers the Hard-Truth Callout and resets your clean streak to 0.
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Advice of the Day</h2>
+        <div id="adviceBox" class="advice-text">Loading daily engineering &amp; focus advice...</div>
+        <button id="nextAdviceBtn" class="secondary" type="button">Next Advice</button>
+      </div>
+
+      <div class="card">
+        <h2>Active Session &amp; Schedule Status</h2>
+        <div id="sessionStatusText" style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">Checking schedule...</div>
+        <div id="nextScheduleText" class="sub-stat" style="margin-bottom: 12px;">Next session: ...</div>
+        <div style="font-size: 12.5px; color: #86efac;">
+          <strong>Accessible Useful Routes:</strong> Instagram Direct Inbox (<code>/direct/inbox/</code>), Educational YouTube Search &amp; Watch, <code>*.edu</code>, Codeforces, LeetCode, GitHub.
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Daily Plans Checklist & Strict Mode Controls -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Daily Plans &amp; Productive Commitments</h2>
+        <p class="sub-stat" style="margin-bottom: 10px;">
+          These tasks are shown whenever you try to open a Reel or Short to remind you what matters.
+        </p>
+        <div id="plansContainer"></div>
+        <div class="input-row">
+          <input id="newPlanInput" type="text" placeholder="Add daily plan (e.g., Read Chapter 4 of CLRS, Solve 3 DP problems)..." />
+          <button id="addPlanBtn" type="button">Add Plan</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Strict Mode &amp; Accountability Tone</h2>
+        <div id="strictStatusBanner" style="font-size: 13.5px; margin-bottom: 12px; color: var(--amber);"></div>
+        <div class="input-row" style="margin-bottom: 12px;">
+          <input id="lockMinutesInput" type="number" min="15" max="1440" value="120" />
+          <button id="engageStrictLockBtn" type="button">Lock Strict Mode (Minutes)</button>
+        </div>
+        <div class="input-row">
+          <label for="toneSelect" style="font-size: 13px; align-self: center;">Intercept Tone:</label>
+          <select id="toneSelect">
+            <option value="hard_truth">Hard-Truth Shaming &amp; Book/Coding Callout (Default)</option>
+            <option value="calm">Calm Neutral Reminder</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Platform Rules & Live Rule Tester -->
+    <div class="grid-2">
+      <div class="card">
+        <h2>Platform Rules &amp; Custom Blocked Domains</h2>
+        <div id="platformsContainer"></div>
+        <div class="input-row">
+          <input id="customDomainInput" type="text" placeholder="Add custom blocked domain (e.g., 9gag.com, twitch.tv)..." />
+          <button id="addCustomDomainBtn" type="button">Block Domain</button>
+        </div>
+        <div id="customDomainsTags" class="tag-list"></div>
+      </div>
+
+      <div class="card">
+        <h2>Interactive Rule Tester &amp; Diagnostics</h2>
+        <p class="sub-stat" style="margin-bottom: 10px;">
+          Verify how ZEROFEED evaluates any URL (e.g., <code>https://www.instagram.com/direct/inbox/</code> vs <code>https://www.youtube.com/shorts/abc</code>).
+        </p>
+        <div class="input-row">
+          <input id="testUrlInput" type="text" value="https://www.youtube.com/shorts/dQw4w9WgXcQ" />
+          <button id="runTestUrlBtn" type="button">Test URL</button>
+        </div>
+        <div id="testUrlOutput" class="test-result">Click "Test URL" to inspect the enforcement decision.</div>
+      </div>
+    </div>
+  </div>
+  <script src="common/rule-engine.js"></script>
+  <script src="dashboard.js"></script>
+</body>
+</html>

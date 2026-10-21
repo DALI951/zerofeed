@@ -1,0 +1,276 @@
+{
+  "schemaVersion": "1.0.0",
+  "productName": "ZEROFEED",
+  "strictMode": {
+    "enabled": true,
+    "lockedUntilIso": null,
+    "lockDurationMinutes": 120,
+    "pinHash": null,
+    "calloutTone": "hard_truth",
+    "cooldownSeconds": 15
+  },
+  "streak": {
+    "currentDays": 1,
+    "cleanSinceIso": "2026-10-21T00:00:00.000Z",
+    "totalSlipsDetected": 0,
+    "todaySlipsDetected": 0,
+    "lastSlipReason": null,
+    "lastSlipIso": null
+  },
+  "dailyPlans": [
+    {
+      "id": "plan-read-book",
+      "title": "Read 25 pages of a technical or non-fiction book",
+      "category": "reading",
+      "completed": false
+    },
+    {
+      "id": "plan-solve-problems",
+      "title": "Solve 3 algorithmic / competitive programming problems",
+      "category": "coding",
+      "completed": false
+    },
+    {
+      "id": "plan-deep-work",
+      "title": "Complete one 90-minute uninterrupted deep-work block",
+      "category": "focus",
+      "completed": false
+    }
+  ],
+  "adviceBank": [
+    "Every 60-second Reel or Short fragments your working memory for up to 20 minutes. Close the tab, open your book, and read one chapter.",
+    "Algorithms are engineered by thousands of PhDs to monetize your attention. Beat them by solving 3 hard coding problems before checking any messages.",
+    "Dopamine from cheap scrolling makes real achievement feel boring. Starve the cheap dopamine so building, reading, and problem-solving become rewarding again.",
+    "You do not need '5 minutes of Reels to relax.' Real rest is a walk, a paper book, or silence—not an infinite slot machine.",
+    "Compare how you feel after 1 hour of Shorts (drained, guilty, foggy) with 1 hour of solving hard problems (sharp, proud, capable). Choose the second one today.",
+    "Communication is a tool; feeds are a trap. Reply to your direct messages with purpose, then close the app immediately.",
+    "Discipline is an architectural decision, not a mood. Keep Strict Mode locked during your study and engineering hours."
+  ],
+  "schedules": [
+    {
+      "id": "sched-deep-work-morning",
+      "name": "Morning Deep Work & Problem Solving",
+      "enabled": true,
+      "daysOfWeek": [0, 1, 2, 3, 4, 5, 6],
+      "startTime": "08:00",
+      "endTime": "13:00",
+      "strictLock": true
+    },
+    {
+      "id": "sched-evening-study",
+      "name": "Evening Study & Reading Session",
+      "enabled": true,
+      "daysOfWeek": [0, 1, 2, 3, 4, 5, 6],
+      "startTime": "18:00",
+      "endTime": "23:30",
+      "strictLock": true
+    }
+  ],
+  "globalAllowlistDomains": [
+    "scholar.google.com",
+    "github.com",
+    "stackoverflow.com",
+    "codeforces.com",
+    "leetcode.com",
+    "wikipedia.org",
+    "arxiv.org",
+    "mit.edu",
+    "stanford.edu",
+    "coursera.org",
+    "edx.org",
+    "khanacademy.org"
+  ],
+  "globalAllowlistPatterns": [
+    "^https?://([a-z0-9-]+\\.)*edu(/.*)?$",
+    "^https?://([a-z0-9-]+\\.)*ac\\.[a-z]{2,3}(/.*)?$"
+  ],
+  "platforms": {
+    "instagram": {
+      "id": "instagram",
+      "name": "Instagram (DMs Only — No Feed / No Reels)",
+      "enabled": true,
+      "domains": ["instagram.com", "www.instagram.com"],
+      "mode": "allow_routes_only",
+      "allowedUrlPatterns": [
+        "^https?://(www\\.)?instagram\\.com/direct(/.*)?$",
+        "^https?://(www\\.)?instagram\\.com/accounts(/.*)?$",
+        "^https?://(www\\.)?instagram\\.com/challenge(/.*)?$"
+      ],
+      "blockedUrlPatterns": [
+        "^https?://(www\\.)?instagram\\.com/?(\\?.*)?$",
+        "^https?://(www\\.)?instagram\\.com/reels?(/.*)?$",
+        "^https?://(www\\.)?instagram\\.com/explore(/.*)?$",
+        "^https?://(www\\.)?instagram\\.com/p/.*",
+        "^https?://(www\\.)?instagram\\.com/stories(/.*)?$"
+      ],
+      "redirectBlockedTo": null,
+      "fallbackSafeUrl": "https://www.instagram.com/direct/inbox/",
+      "hideSelectors": [
+        "a[href='/']",
+        "a[href='/explore/']",
+        "a[href*='/reels/']",
+        "a[href*='/reel/']",
+        "svg[aria-label='Explore']",
+        "svg[aria-label='Reels']",
+        "svg[aria-label='Home']",
+        "article",
+        "div[role='presentation'] video"
+      ],
+      "androidPackage": "com.instagram.android",
+      "androidPolicy": "controlled_webview_or_block"
+    },
+    "youtube": {
+      "id": "youtube",
+      "name": "YouTube (Educational & Search — No Shorts / No Home Feed)",
+      "enabled": true,
+      "domains": ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"],
+      "mode": "block_patterns_and_clean_dom",
+      "allowedUrlPatterns": [
+        "^https?://(www\\.|m\\.)?youtube\\.com/watch\\?v=.*",
+        "^https?://(www\\.|m\\.)?youtube\\.com/results\\?search_query=.*",
+        "^https?://(www\\.|m\\.)?youtube\\.com/playlist\\?list=.*",
+        "^https?://(www\\.|m\\.)?youtube\\.com/feed/subscriptions.*",
+        "^https?://(www\\.|m\\.)?youtube\\.com/feed/library.*",
+        "^https?://(www\\.|m\\.)?youtube\\.com/@[A-Za-z0-9_.-]+(/videos|/playlists|/search)?$",
+        "^https?://youtu\\.be/[A-Za-z0-9_-]+$"
+      ],
+      "blockedUrlPatterns": [
+        "^https?://(www\\.|m\\.)?youtube\\.com/shorts(/.*)?$",
+        "^https?://(www\\.|m\\.)?youtube\\.com/feed/trending.*",
+        "^https?://(www\\.|m\\.)?youtube\\.com/feed/explore.*"
+      ],
+      "hideSelectors": [
+        "ytd-reel-shelf-renderer",
+        "ytm-reel-shelf-renderer",
+        "ytd-rich-shelf-renderer[is-shorts]",
+        "a[title='Shorts']",
+        "a[href^='/shorts']",
+        "ytd-guide-entry-renderer:has(a[title='Shorts'])",
+        "ytd-mini-guide-entry-renderer[aria-label='Shorts']",
+        "ytm-pivot-bar-item-renderer:has(div.pivot-shorts)",
+        "ytd-browse[page-subtype='home'] #contents",
+        "ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch']",
+        ".ytp-autonav-toggle-button-container",
+        "ytd-compact-autoplay-renderer",
+        "#related ytd-reel-shelf-renderer"
+      ],
+      "androidPackage": "com.google.android.youtube",
+      "androidPolicy": "block_shorts_and_home"
+    },
+    "tiktok": {
+      "id": "tiktok",
+      "name": "TikTok (Complete Block)",
+      "enabled": true,
+      "domains": ["tiktok.com", "www.tiktok.com", "m.tiktok.com", "vm.tiktok.com"],
+      "mode": "block_domain",
+      "allowedUrlPatterns": [],
+      "blockedUrlPatterns": ["^https?://([a-z0-9-]+\\.)*tiktok\\.com(/.*)?$"],
+      "hideSelectors": ["body"],
+      "androidPackage": "com.zhiliaoapp.musically",
+      "androidPolicy": "block_app"
+    },
+    "facebook": {
+      "id": "facebook",
+      "name": "Facebook (Messenger Allowed — Feed & Reels Blocked)",
+      "enabled": true,
+      "domains": ["facebook.com", "www.facebook.com", "m.facebook.com"],
+      "mode": "allow_routes_only",
+      "allowedUrlPatterns": [
+        "^https?://(www\\.|m\\.)?facebook\\.com/messages(/.*)?$"
+      ],
+      "blockedUrlPatterns": [
+        "^https?://(www\\.|m\\.)?facebook\\.com/?(\\?.*)?$",
+        "^https?://(www\\.|m\\.)?facebook\\.com/reel(/.*)?$",
+        "^https?://(www\\.|m\\.)?facebook\\.com/watch(/.*)?$"
+      ],
+      "fallbackSafeUrl": "https://www.facebook.com/messages/",
+      "hideSelectors": [
+        "div[role='feed']",
+        "a[aria-label='Reels']",
+        "a[href*='/reel/']",
+        "a[href*='/watch/']"
+      ],
+      "androidPackage": "com.facebook.katana",
+      "androidPolicy": "block_app"
+    },
+    "reddit": {
+      "id": "reddit",
+      "name": "Reddit (Specific Thread Search Only — Home/Popular Feeds Blocked)",
+      "enabled": true,
+      "domains": ["reddit.com", "www.reddit.com", "old.reddit.com"],
+      "mode": "block_patterns_and_clean_dom",
+      "allowedUrlPatterns": [
+        "^https?://(www\\.|old\\.)?reddit\\.com/r/[A-Za-z0-9_]+/comments/.*",
+        "^https?://(www\\.|old\\.)?reddit\\.com/search/?\\?.*"
+      ],
+      "blockedUrlPatterns": [
+        "^https?://(www\\.|old\\.)?reddit\\.com/?(\\?.*)?$",
+        "^https?://(www\\.|old\\.)?reddit\\.com/r/(popular|all)(/.*)?$"
+      ],
+      "hideSelectors": [
+        "shreddit-feed",
+        "#trending-today-container",
+        "reddit-sidebar-nav"
+      ],
+      "androidPackage": "com.reddit.frontpage",
+      "androidPolicy": "block_app"
+    },
+    "twitter": {
+      "id": "twitter",
+      "name": "X / Twitter (Messages & Search Only — Algorithmic For-You Feed Blocked)",
+      "enabled": true,
+      "domains": ["x.com", "www.x.com", "twitter.com", "www.twitter.com"],
+      "mode": "allow_routes_only",
+      "allowedUrlPatterns": [
+        "^https?://(www\\.)?(x|twitter)\\.com/messages(/.*)?$",
+        "^https?://(www\\.)?(x|twitter)\\.com/search\\?.*"
+      ],
+      "blockedUrlPatterns": [
+        "^https?://(www\\.)?(x|twitter)\\.com/?$",
+        "^https?://(www\\.)?(x|twitter)\\.com/home(/.*)?$",
+        "^https?://(www\\.)?(x|twitter)\\.com/explore(/.*)?$",
+        "^https?://(www\\.)?(x|twitter)\\.com/i/bookmarks(/.*)?$"
+      ],
+      "fallbackSafeUrl": "https://x.com/messages",
+      "hideSelectors": [
+        "div[aria-label='Timeline: Your Home Timeline']",
+        "div[aria-label='Trending']",
+        "a[aria-label='Grok']",
+        "a[aria-label='Explore']"
+      ],
+      "androidPackage": "com.twitter.android",
+      "androidPolicy": "block_app"
+    },
+    "snapchat": {
+      "id": "snapchat",
+      "name": "Snapchat (Spotlight & Web Stories Blocked)",
+      "enabled": true,
+      "domains": ["snapchat.com", "www.snapchat.com", "web.snapchat.com"],
+      "mode": "block_patterns_and_clean_dom",
+      "allowedUrlPatterns": [
+        "^https?://web\\.snapchat\\.com/?$"
+      ],
+      "blockedUrlPatterns": [
+        "^https?://(www\\.)?snapchat\\.com/spotlight(/.*)?$",
+        "^https?://(www\\.)?snapchat\\.com/discover(/.*)?$"
+      ],
+      "hideSelectors": [
+        "div[data-testid='spotlight-feed']"
+      ],
+      "androidPackage": "com.snapchat.android",
+      "androidPolicy": "block_spotlight"
+    }
+  },
+  "customBlockedDomains": [],
+  "customBlockedUrlPatterns": [],
+  "emergencyAllowedAndroidPackages": [
+    "com.samsung.android.dialer",
+    "com.google.android.dialer",
+    "com.samsung.android.messaging",
+    "com.google.android.apps.messaging",
+    "com.android.settings",
+    "com.google.android.apps.authenticator2",
+    "com.azure.authenticator",
+    "com.duosecurity.duomobile"
+  ]
+}

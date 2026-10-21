@@ -1,0 +1,93 @@
+name: ZEROFEED Cross-Device Build & CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  extension-and-core-tests:
+    name: Core Rule Engine & Chrome/Edge Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Sync shared rule engine into browser extension
+        run: npm run sync:extension
+
+      - name: Run automated rule engine & extension tests
+        run: npm test
+
+      - name: Package Chrome & Edge Manifest V3 Extension
+        run: zip -r zerofeed-browser-extension.zip browser-extension/
+
+      - name: Upload Browser Extension Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerofeed-browser-extension
+          path: zerofeed-browser-extension.zip
+
+  windows-companion-build:
+    name: Windows Desktop & Low-RAM Laptop Companion (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build native ZeroFeedWindows.exe
+        run: npm run build:windows
+
+      - name: Verify ZeroFeedWindows.exe CLI & Rule Evaluator
+        run: .\windows-app\dist\ZeroFeedWindows.exe --verify
+
+      - name: Run full Windows test suite
+        run: npm test
+
+      - name: Upload Windows Companion Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerofeed-windows-companion
+          path: windows-app/dist/ZeroFeedWindows.exe
+
+  android-apk-build:
+    name: Android 16 / One UI App (Kotlin + Jetpack Compose)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make gradlew executable
+        working-directory: android-app
+        run: chmod +x ./gradlew
+
+      - name: Run Android Kotlin JUnit Tests & Assemble APK
+        working-directory: android-app
+        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
+
+      - name: Upload Android APK Artifact (Galaxy S23 Ultra Ready)
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerofeed-android-apk
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk

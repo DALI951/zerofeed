@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ZEROFEED</string>
+    <string name="accessibility_service_label">ZEROFEED Anti-Scrolling Guard</string>
+    <string name="accessibility_service_description">Detects when blocked short-form video apps, Reels, or Shorts are opened and redirects to your ZEROFEED focus plan. Never reads passwords or private messages.</string>
+</resources>

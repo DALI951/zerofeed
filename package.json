@@ -1,0 +1,11 @@
+{
+  "name": "zerofeed",
+  "version": "1.0.0",
+  "description": "ZEROFEED — Cross-Device Anti-Scrolling System (Browser Extension, Windows Companion, Android App)",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "sync:extension": "node scripts/sync-extension-common.js",
+    "build:windows": "node scripts/build-windows.js"
+  }
+}
