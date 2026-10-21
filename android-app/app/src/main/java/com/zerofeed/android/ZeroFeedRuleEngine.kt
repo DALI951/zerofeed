@@ -97,17 +97,18 @@ object ZeroFeedRuleEngine {
 
         // 3. Instagram: DMs Allowed (/direct/*), Feed/Reels/Explore Blocked
         if (host == "instagram.com" || host.endsWith(".instagram.com")) {
-            val allowedIg = Regex("""^https?://(www\.)?instagram\.com/(direct|accounts|challenge)(/.*)?$""", RegexOption.IGNORE_CASE)
-            if (allowedIg.matches(fullUrl)) {
-                return UrlVerdict("ALLOW", "instagram", "NONE", "Allowed Instagram Direct Messaging route", "https://www.instagram.com/direct/inbox/")
+            val blockedIg = Regex("""^https?://(www\.)?instagram\.com/(reels?|explore|stories)(/.*)?$""", RegexOption.IGNORE_CASE)
+            val homeFeed = Regex("""^https?://(www\.)?instagram\.com/?(\?.*)?$""", RegexOption.IGNORE_CASE)
+            if (blockedIg.matches(fullUrl) || homeFeed.matches(fullUrl)) {
+                return UrlVerdict(
+                    "BLOCK",
+                    "instagram",
+                    classifyViolation(fullUrl, "instagram"),
+                    "Blocked Instagram Feed/Reels/Explore (Direct Messages Only)",
+                    "https://www.instagram.com/direct/inbox/"
+                )
             }
-            return UrlVerdict(
-                "BLOCK",
-                "instagram",
-                classifyViolation(fullUrl, "instagram"),
-                "Blocked Instagram Feed/Reels/Explore (Direct Messages Only)",
-                "https://www.instagram.com/direct/inbox/"
-            )
+            return UrlVerdict("ALLOW", "instagram", "NONE", "Allowed Instagram messaging or account route", "https://www.instagram.com/direct/inbox/")
         }
 
         // 4. YouTube: Search & Watch Allowed, Shorts & Trending Blocked

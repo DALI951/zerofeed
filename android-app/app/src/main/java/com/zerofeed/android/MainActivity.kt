@@ -1,14 +1,19 @@
 package com.zerofeed.android
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,13 +26,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import java.net.URLEncoder
 import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
@@ -39,37 +47,62 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         handleIncomingIntent(intent)
 
         setContent {
-            MaterialTheme(
-                colorScheme = darkColorScheme(
-                    background = Color(0xFF080B11),
-                    surface = Color(0xFF111724),
+            val context = LocalContext.current
+            // Follow the phone's wallpaper / system colors using Material You Dynamic Color on Android 12+ (One UI)
+            val dynamicColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                dynamicDarkColorScheme(context)
+            } else {
+                darkColorScheme(
                     primary = Color(0xFF38BDF8),
+                    onPrimary = Color(0xFF003549),
+                    primaryContainer = Color(0xFF004D68),
+                    onPrimaryContainer = Color(0xFFBEE9FF),
                     secondary = Color(0xFF22C55E),
-                    error = Color(0xFFEF4444)
+                    background = Color(0xFF0B0F17),
+                    surface = Color(0xFF131B28),
+                    surfaceVariant = Color(0xFF1E2838),
+                    onSurface = Color(0xFFE2E8F0),
+                    onSurfaceVariant = Color(0xFF94A3B8)
+                )
+            }
+
+            MaterialTheme(
+                colorScheme = dynamicColors,
+                shapes = Shapes(
+                    extraSmall = RoundedCornerShape(12.dp),
+                    small = RoundedCornerShape(16.dp),
+                    medium = RoundedCornerShape(22.dp),
+                    large = RoundedCornerShape(26.dp),
+                    extraLarge = RoundedCornerShape(32.dp)
                 )
             ) {
-                ZeroFeedAndroidApp(
-                    initialTab = requestedTabState,
-                    resumeTick = resumeTriggerTick,
-                    interceptSource = interceptSourceState,
-                    interceptViolationType = interceptViolationState,
-                    onDismissIntercept = { interceptSourceState = null },
-                    onTriggerIntercept = { source, vType ->
-                        ZeroFeedRepository(this).recordSlip(source)
-                        interceptSourceState = source
-                        interceptViolationState = vType
-                    }
-                )
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    ZeroFeedAndroidApp(
+                        initialTab = requestedTabState,
+                        resumeTick = resumeTriggerTick,
+                        interceptSource = interceptSourceState,
+                        interceptViolationType = interceptViolationState,
+                        onDismissIntercept = { interceptSourceState = null },
+                        onTriggerIntercept = { source, vType ->
+                            ZeroFeedRepository(this).recordSlip(source)
+                            interceptSourceState = source
+                            interceptViolationState = vType
+                        }
+                    )
+                }
             }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        // Re-check permissions automatically whenever user returns from Android Settings
         resumeTriggerTick += 1
     }
 
@@ -113,12 +146,10 @@ fun ZeroFeedAndroidApp(
     var adviceOffset by remember { mutableIntStateOf(0) }
     var strictLocked by remember { mutableStateOf(repo.isStrictLocked()) }
 
-    // Permission states (auto-refreshed on startup and onResume)
     var accessibilityEnabled by remember { mutableStateOf(PermissionHelper.isAccessibilityServiceEnabled(context)) }
     var overlayGranted by remember { mutableStateOf(PermissionHelper.canDrawOverlays(context)) }
     var showPermissionDialog by remember { mutableStateOf(!accessibilityEnabled || !overlayGranted) }
 
-    // Auto-Updater states
     var updateInfo by remember { mutableStateOf<ReleaseUpdateInfo?>(null) }
     var updateStatusText by remember { mutableStateOf("Checking GitHub Releases for updates...") }
     var downloadProgress by remember { mutableIntStateOf(-1) }
@@ -141,7 +172,7 @@ fun ZeroFeedAndroidApp(
                 updateStatusText = if (info.isNewerAvailable) {
                     "NEW UPDATE AVAILABLE: ${info.latestTag} (Installed: v${info.currentVersion})"
                 } else {
-                    "Up to date! Installed: v${info.currentVersion} (Latest GitHub Release: ${info.latestTag})"
+                    "Up to date! Installed: v${info.currentVersion} (Latest Release: ${info.latestTag})"
                 }
             }.onFailure { err ->
                 updateStatusText = "Update check note: ${err.message}"
@@ -162,63 +193,67 @@ fun ZeroFeedAndroidApp(
 
     val dayOfYear = remember { Calendar.getInstance().get(Calendar.DAY_OF_YEAR) }
 
-    // Automatic Startup Permission Setup Modal when Accessibility or Overlay permission is missing
+    // Automatic Startup Permission Prompt
     if (showPermissionDialog && (!accessibilityEnabled || !overlayGranted)) {
         AlertDialog(
             onDismissRequest = { showPermissionDialog = false },
-            containerColor = Color(0xFF111724),
-            titleContentColor = Color(0xFF38BDF8),
-            textContentColor = Color.White,
+            shape = RoundedCornerShape(28.dp),
+            containerColor = MaterialTheme.colorScheme.surface,
+            titleContentColor = MaterialTheme.colorScheme.primary,
+            textContentColor = MaterialTheme.colorScheme.onSurface,
             title = {
                 Text(
-                    "Permissions Needed to Close Reels/Shorts & Hide Feeds",
-                    fontWeight = FontWeight.ExtraBold,
+                    "Permissions for In-App Reel/Short Quitting",
+                    fontWeight = FontWeight.Bold,
                     fontSize = 17.sp
                 )
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "To quit Reels/Shorts inside your real Instagram & YouTube apps and cover their home feeds, grant these 2 permissions:",
+                        "Grant these permissions so ZEROFEED can quit Reels & Shorts in your official apps and preserve your focus:",
                         fontSize = 13.sp,
-                        color = Color(0xFFCBD5E1)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "• Samsung One UI Tip: If Accessibility is grayed out ('Restricted setting'), tap Step 1 first → tap ⋮ (top-right) → 'Allow restricted settings'.",
+                        "• Samsung One UI Tip: If Accessibility is grayed out, tap Step 1 first → tap ⋮ (top-right) → 'Allow restricted settings'.",
                         fontSize = 12.sp,
-                        color = Color(0xFFFBBF24)
+                        color = MaterialTheme.colorScheme.tertiary
                     )
                     Button(
                         onClick = { PermissionHelper.openAppDetailsSettings(context) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF334155)),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("1. Open App Info (Allow Restricted Settings)", color = Color.White, fontSize = 12.sp)
+                        Text("1. Open App Info (Allow Restricted Settings)", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
                     }
                     Button(
                         onClick = { PermissionHelper.openOverlayPermissionSettings(context) },
+                        shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (overlayGranted) Color(0xFF22C55E) else Color(0xFF38BDF8)
+                            containerColor = if (overlayGranted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            if (overlayGranted) "✓ 2. Appear on Top (Granted)" else "2. Grant 'Appear on Top' (Hide Feeds)",
-                            color = Color.Black,
+                            if (overlayGranted) "✓ 2. Appear on Top (Granted)" else "2. Grant 'Appear on Top'",
+                            color = MaterialTheme.colorScheme.onPrimary,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
                     }
                     Button(
                         onClick = { PermissionHelper.openAccessibilitySettings(context) },
+                        shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (accessibilityEnabled) Color(0xFF22C55E) else Color(0xFFEF4444)
+                            containerColor = if (accessibilityEnabled) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            if (accessibilityEnabled) "✓ 3. Accessibility Guard (Enabled)" else "3. Turn On Accessibility Guard (Quit Reels/Shorts)",
-                            color = Color.White,
+                            if (accessibilityEnabled) "✓ 3. Accessibility Guard (Enabled)" else "3. Turn On Accessibility Guard",
+                            color = MaterialTheme.colorScheme.onError,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
@@ -227,13 +262,13 @@ fun ZeroFeedAndroidApp(
             },
             confirmButton = {
                 TextButton(onClick = { showPermissionDialog = false }) {
-                    Text("Continue to App", color = Color(0xFF38BDF8))
+                    Text("Continue to App", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                 }
             }
         )
     }
 
-    // If a Reel, Short, or Blocked Feed was just intercepted, show the Hard-Truth Accountability Callout Screen
+    // Hard-Truth Callout Screen
     if (interceptSource != null) {
         val callout = ZeroFeedRuleEngine.buildHardTruthCallout(interceptSource, interceptViolationType, dayOfYear)
         HardTruthCalloutScreen(
@@ -254,83 +289,37 @@ fun ZeroFeedAndroidApp(
         return
     }
 
-    // Tabs 1 (Instagram DMs) and 2 (YouTube) run in 100% FULL-SCREEN NATIVE-LOOK MODE
+    // Tab 1: Clean Instagram Direct Mode (Safe Status Bar insets, Cookie Enabled, No Black Screen)
     if (selectedTab == 1) {
-        SeamlessNativeLookExperience(
-            backgroundColor = Color(0xFF000000),
-            initialUrl = "https://www.instagram.com/direct/inbox/",
-            injectedCss = """
-                a[href='/'], a[href='/explore/'], a[href*='/reels/'], a[href*='/reel/'],
-                svg[aria-label='Explore'], svg[aria-label='Reels'], svg[aria-label='Home'],
-                div[role='tablist'] a:not([href*='direct']) {
-                    display: none !important;
-                    pointer-events: none !important;
-                }
-                body, html { background-color: #000000 !important; }
-            """.trimIndent(),
-            injectedJs = """
-                (function() {
-                    if (window.location.pathname === '/' || window.location.pathname.startsWith('/reels') || window.location.pathname.startsWith('/explore')) {
-                        window.location.replace('https://www.instagram.com/direct/inbox/');
-                    }
-                })();
-            """.trimIndent(),
+        InstagramDirectScreen(
+            onBackToDashboard = { selectedTab = 0 },
             onBlockedNavigation = { blockedUrl, vType ->
                 onTriggerIntercept("Instagram Reel / Feed ($blockedUrl)", vType)
-            },
-            onExitToZeroFeedHome = { selectedTab = 0 }
+            }
         )
         return
     }
 
+    // Tab 2: Clean YouTube with Centered Search Hero & Safe Insets
     if (selectedTab == 2) {
-        SeamlessNativeLookExperience(
-            backgroundColor = Color(0xFF0F0F0F),
-            initialUrl = "https://m.youtube.com",
-            injectedCss = """
-                ytm-reel-shelf-renderer, ytd-reel-shelf-renderer,
-                ytm-shorts-lockup-view-model, ytm-rich-section-renderer,
-                a[href^='/shorts'], a[href*='/shorts/'],
-                ytm-pivot-bar-item-renderer:has(div.pivot-shorts),
-                ytm-pivot-bar-item-renderer:nth-child(2),
-                ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch'] ytm-rich-grid-renderer,
-                ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch'] ytm-section-list-renderer {
-                    display: none !important;
-                    visibility: hidden !important;
-                    pointer-events: none !important;
-                }
-                ytm-mobile-topbar-renderer, header {
-                    display: flex !important;
-                    visibility: visible !important;
-                }
-                body, html { background-color: #0f0f0f !important; }
-            """.trimIndent(),
-            injectedJs = """
-                (function() {
-                    if (window.location.pathname === '/' && !document.getElementById('zf-yt-clean-home')) {
-                        var msg = document.createElement('div');
-                        msg.id = 'zf-yt-clean-home';
-                        msg.style.cssText = 'margin: 90px 24px 20px; padding: 24px; border-radius: 12px; background: #181818; color: #f1f1f1; font-family: Roboto, sans-serif; text-align: center; border: 1px solid #272727;';
-                        msg.innerHTML = '<div style="font-size:16px;font-weight:600;margin-bottom:8px;">YouTube Clean Search Mode</div><div style="font-size:13px;color:#aaaaaa;">Home Feed & Shorts are removed. Use the YouTube Search Bar at the top to search for any lecture, tutorial, or video.</div>';
-                        document.body.appendChild(msg);
-                    } else if (window.location.pathname !== '/') {
-                        var existing = document.getElementById('zf-yt-clean-home');
-                        if (existing) existing.remove();
-                    }
-                })();
-            """.trimIndent(),
+        YouTubeCleanSearchScreen(
+            onBackToDashboard = { selectedTab = 0 },
             onBlockedNavigation = { blockedUrl, vType ->
                 onTriggerIntercept("YouTube Short ($blockedUrl)", vType)
-            },
-            onExitToZeroFeedHome = { selectedTab = 0 }
+            }
         )
         return
     }
 
+    // Default: Home Dashboard Scaffold
     Scaffold(
-        containerColor = Color(0xFF080B11),
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
-            NavigationBar(containerColor = Color(0xFF111724)) {
+            NavigationBar(
+                containerColor = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
                 val tabs = listOf("Home", "Instagram", "YouTube", "Rules")
                 tabs.forEachIndexed { idx, label ->
                     NavigationBarItem(
@@ -340,7 +329,7 @@ fun ZeroFeedAndroidApp(
                             selectedTab = idx
                         },
                         icon = { Text(label.take(2).uppercase(), fontWeight = FontWeight.Bold) },
-                        label = { Text(label, fontSize = 11.sp) }
+                        label = { Text(label, fontSize = 11.5.sp, fontWeight = FontWeight.Medium) }
                     )
                 }
             }
@@ -408,98 +397,412 @@ fun ZeroFeedAndroidApp(
     }
 }
 
+/**
+ * Clean Instagram Direct Messages Screen:
+ * - Proper top Status Bar padding (never renders under the clock/camera cutout)
+ * - Cookies & DOM storage enabled so login works reliably and never gets stuck on black screen
+ * - Hides feeds & reels while allowing full Direct Messages chatting
+ */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun SeamlessNativeLookExperience(
-    backgroundColor: Color,
-    initialUrl: String,
-    injectedCss: String,
-    injectedJs: String,
-    onBlockedNavigation: (String, String) -> Unit,
-    onExitToZeroFeedHome: () -> Unit
+fun InstagramDirectScreen(
+    onBackToDashboard: () -> Unit,
+    onBlockedNavigation: (String, String) -> Unit
 ) {
+    val context = LocalContext.current
     var webViewRef by remember { mutableStateOf<WebView?>(null) }
+    var currentTitle by remember { mutableStateOf("Instagram Direct Messages") }
 
     BackHandler {
         val wv = webViewRef
         if (wv != null && wv.canGoBack()) {
             wv.goBack()
         } else {
-            onExitToZeroFeedHome()
+            onBackToDashboard()
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(backgroundColor)) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    webViewRef = this
-                    setBackgroundColor(android.graphics.Color.BLACK)
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.mediaPlaybackRequiresUserGesture = false
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        // Safe Top Bar with smooth pill actions
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Button(
+                onClick = onBackToDashboard,
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text("← Home", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                text = currentTitle,
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Button(
+                onClick = {
+                    val intent = context.packageManager.getLaunchIntentForPackage("com.instagram.android")
+                    if (intent != null) context.startActivity(intent)
+                    else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://instagram.com")))
+                },
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("App", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+            }
+        }
 
-                    val applyCleanDom = { view: WebView? ->
-                        val script = """
-                            (function() {
-                                var s = document.getElementById('zerofeed-native-clean-style');
-                                if (!s) {
-                                    s = document.createElement('style');
-                                    s.id = 'zerofeed-native-clean-style';
-                                    (document.head || document.documentElement).appendChild(s);
-                                }
-                                s.textContent = `$injectedCss`;
-                                $injectedJs
-                            })();
-                        """.trimIndent()
-                        view?.evaluateJavascript(script, null)
-                    }
+        Box(modifier = Modifier.fillMaxSize()) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        webViewRef = this
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
 
-                    webViewClient = object : WebViewClient() {
-                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                            val target = request?.url?.toString() ?: return false
-                            val verdict = ZeroFeedRuleEngine.evaluateUrl(target)
-                            if (verdict.action == "BLOCK") {
-                                onBlockedNavigation(target, verdict.violationType)
-                                return true
-                            }
-                            return false
+                        val cookieManager = CookieManager.getInstance()
+                        cookieManager.setAcceptCookie(true)
+                        cookieManager.setAcceptThirdPartyCookies(this, true)
+
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
+                        settings.useWideViewPort = true
+                        settings.loadWithOverviewMode = true
+                        settings.userAgentString =
+                            "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36"
+
+                        val applyScript = { view: WebView? ->
+                            val js = """
+                                (function() {
+                                    var p = window.location.pathname;
+                                    var isAuth = p.includes('/accounts/') || p.includes('/login') || p.includes('/challenge');
+                                    if (!isAuth) {
+                                        var style = document.getElementById('zf-ig-style');
+                                        if (!style) {
+                                            style = document.createElement('style');
+                                            style.id = 'zf-ig-style';
+                                            (document.head || document.documentElement).appendChild(style);
+                                        }
+                                        style.textContent = `
+                                            a[href='/explore/'], a[href*='/reels/'], a[href*='/reel/'],
+                                            svg[aria-label='Explore'], svg[aria-label='Reels'],
+                                            div[role='tablist'] a:not([href*='direct']) {
+                                                display: none !important;
+                                                pointer-events: none !important;
+                                            }
+                                        `;
+                                        if (p === '/' || p.startsWith('/reels') || p.startsWith('/explore')) {
+                                            window.location.replace('https://www.instagram.com/direct/inbox/');
+                                        }
+                                    }
+                                })();
+                            """.trimIndent()
+                            view?.evaluateJavascript(js, null)
                         }
 
-                        override fun onPageCommitVisible(view: WebView?, url: String?) {
-                            super.onPageCommitVisible(view, url)
-                            applyCleanDom(view)
-                        }
-
-                        override fun onPageFinished(view: WebView?, url: String?) {
-                            super.onPageFinished(view, url)
-                            if (url != null) {
-                                val verdict = ZeroFeedRuleEngine.evaluateUrl(url)
+                        webViewClient = object : WebViewClient() {
+                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                val target = request?.url?.toString() ?: return false
+                                val verdict = ZeroFeedRuleEngine.evaluateUrl(target)
                                 if (verdict.action == "BLOCK") {
-                                    if (view?.canGoBack() == true) view.goBack()
-                                    onBlockedNavigation(url, verdict.violationType)
-                                    return
+                                    onBlockedNavigation(target, verdict.violationType)
+                                    return true
+                                }
+                                return false
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                super.onPageFinished(view, url)
+                                if (url != null) {
+                                    currentTitle = if (url.contains("/direct/")) "Direct Messages" else "Instagram"
+                                }
+                                applyScript(view)
+                            }
+                        }
+
+                        loadUrl("https://www.instagram.com/direct/inbox/")
+                    }
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Clean YouTube Search Hero Experience:
+ * - When no search is active: Shows a prominent, beautiful, centered search bar right in the middle of the screen!
+ * - When searching: displays YouTube search results with Shorts stripped and status bar safe insets
+ */
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun YouTubeCleanSearchScreen(
+    onBackToDashboard: () -> Unit,
+    onBlockedNavigation: (String, String) -> Unit
+) {
+    val context = LocalContext.current
+    var queryText by remember { mutableStateOf("") }
+    var activeUrl by remember { mutableStateOf<String?>(null) }
+    var webViewRef by remember { mutableStateOf<WebView?>(null) }
+
+    fun executeSearch(query: String) {
+        val q = query.trim()
+        if (q.isNotBlank()) {
+            val encoded = URLEncoder.encode(q, "UTF-8")
+            activeUrl = "https://m.youtube.com/results?search_query=$encoded"
+        }
+    }
+
+    BackHandler {
+        if (activeUrl != null) {
+            val wv = webViewRef
+            if (wv != null && wv.canGoBack()) {
+                wv.goBack()
+            } else {
+                activeUrl = null
+            }
+        } else {
+            onBackToDashboard()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    ) {
+        // Top Action Bar
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Button(
+                onClick = {
+                    if (activeUrl != null) activeUrl = null else onBackToDashboard()
+                },
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text(if (activeUrl != null) "← Search Home" else "← Home", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+            Text(
+                text = "YouTube Clean Study",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Button(
+                onClick = {
+                    val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.youtube")
+                    if (intent != null) context.startActivity(intent)
+                    else context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://m.youtube.com")))
+                },
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000)),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text("App", color = Color.White, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Mode A: Prominent Centered Search Bar (Middle of the Screen)
+        if (activeUrl == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    // Shield Badge
+                    Surface(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Text(
+                            text = "ZERO-SHORTS // CLEAN STUDY",
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "What do you want to learn?",
+                        color = MaterialTheme.colorScheme.onBackground,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Feeds and Shorts are removed so your mind stays sharp. Search directly for any lecture, tutorial, or course.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(26.dp))
+
+                    // Prominent Middle Search Bar
+                    OutlinedTextField(
+                        value = queryText,
+                        onValueChange = { queryText = it },
+                        placeholder = { Text("Search YouTube for lectures, tutorials, music...", fontSize = 13.5.sp) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(28.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingIcon = {
+                            Button(
+                                onClick = { executeSearch(queryText) },
+                                shape = CircleShape,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                                modifier = Modifier.padding(end = 6.dp)
+                            ) {
+                                Text("Search", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Educational Quick-Pills
+                    Text(
+                        text = "Suggested Educational Topics:",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val quickPills = listOf(
+                        "Algorithms & Data Structures",
+                        "MIT OpenCourseWare",
+                        "Calculus & Linear Algebra",
+                        "System Design & Architecture",
+                        "Deep Work Focus Music"
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        quickPills.chunked(2).forEach { rowItems ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                rowItems.forEach { topic ->
+                                    Surface(
+                                        color = MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = CircleShape,
+                                        modifier = Modifier.clickable {
+                                            queryText = topic
+                                            executeSearch(topic)
+                                        }
+                                    ) {
+                                        Text(
+                                            text = topic,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                        )
+                                    }
                                 }
                             }
-                            applyCleanDom(view)
                         }
                     }
-                    loadUrl(initialUrl)
                 }
             }
-        )
+        } else {
+            // Mode B: Active Search Results / Video Player View
+            Box(modifier = Modifier.fillMaxSize()) {
+                AndroidView(
+                    modifier = Modifier.fillMaxSize(),
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            webViewRef = this
+                            setBackgroundColor(android.graphics.Color.BLACK)
+                            settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
+                            settings.mediaPlaybackRequiresUserGesture = false
+                            settings.userAgentString =
+                                "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.122 Mobile Safari/537.36"
 
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(12.dp)
-                .background(Color(0xCC111724), CircleShape)
-                .border(1.dp, Color(0x6638BDF8), CircleShape)
-                .clickable { onExitToZeroFeedHome() }
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-        ) {
-            Text("ZF Home", color = Color(0xFF38BDF8), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            val cleanCss = """
+                                ytm-reel-shelf-renderer, ytd-reel-shelf-renderer,
+                                ytm-shorts-lockup-view-model, a[href^='/shorts'], a[href*='/shorts/'],
+                                ytm-pivot-bar-item-renderer:has(div.pivot-shorts),
+                                ytm-pivot-bar-item-renderer:nth-child(2),
+                                ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch'] {
+                                    display: none !important;
+                                    visibility: hidden !important;
+                                }
+                                body, html { background-color: #0f0f0f !important; }
+                            """.trimIndent()
+
+                            val applyDom = { view: WebView? ->
+                                val js = """
+                                    (function() {
+                                        var s = document.getElementById('zf-yt-clean-style');
+                                        if (!s) {
+                                            s = document.createElement('style');
+                                            s.id = 'zf-yt-clean-style';
+                                            (document.head || document.documentElement).appendChild(s);
+                                        }
+                                        s.textContent = `$cleanCss`;
+                                    })();
+                                """.trimIndent()
+                                view?.evaluateJavascript(js, null)
+                            }
+
+                            webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                    val target = request?.url?.toString() ?: return false
+                                    val verdict = ZeroFeedRuleEngine.evaluateUrl(target)
+                                    if (verdict.action == "BLOCK") {
+                                        onBlockedNavigation(target, verdict.violationType)
+                                        return true
+                                    }
+                                    return false
+                                }
+
+                                override fun onPageFinished(view: WebView?, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    applyDom(view)
+                                }
+                            }
+                            loadUrl(activeUrl ?: "https://m.youtube.com")
+                        }
+                    },
+                    update = { view ->
+                        if (activeUrl != null && view.url != activeUrl) {
+                            view.loadUrl(activeUrl!!)
+                        }
+                    }
+                )
+            }
         }
     }
 }
@@ -517,78 +820,88 @@ fun HardTruthCalloutScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0608))
+            .background(MaterialTheme.colorScheme.background)
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(22.dp)
     ) {
-        Text(
-            text = callout.headline,
-            color = Color(0xFFFCA5A5),
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(6.dp))
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            shape = CircleShape,
+            modifier = Modifier.padding(bottom = 6.dp)
+        ) {
+            Text(
+                text = callout.headline,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = "Clean Streak Protected: $streakDays Day(s) | Distractions Stopped Today: $todayDeflected (Total: $totalDeflected)",
-            color = Color(0xFF86EFAC),
+            color = MaterialTheme.colorScheme.secondary,
             fontSize = 12.sp,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(modifier = Modifier.height(14.dp))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color(0xFF261014), RoundedCornerShape(10.dp))
-                .border(1.dp, Color(0xFFEF4444), RoundedCornerShape(10.dp))
-                .padding(16.dp)
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text(
                 text = callout.shameMessage,
-                color = Color(0xFFFECACA),
-                fontSize = 15.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 14.5.sp,
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = 22.sp
+                lineHeight = 21.sp,
+                modifier = Modifier.padding(18.dp)
             )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
-        CardSection(title = "READ A REAL BOOK INSTEAD") {
-            Text(callout.bookReminder, color = Color.White, fontSize = 13.5.sp)
+        SmoothCardSection(title = "READ A REAL BOOK INSTEAD") {
+            Text(callout.bookReminder, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.5.sp)
         }
         Spacer(modifier = Modifier.height(10.dp))
-        CardSection(title = "SOLVE ALGORITHMIC / CODING PROBLEMS INSTEAD") {
-            Text(callout.problemReminder, color = Color.White, fontSize = 13.5.sp)
+        SmoothCardSection(title = "SOLVE ALGORITHMIC / CODING PROBLEMS INSTEAD") {
+            Text(callout.problemReminder, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.5.sp)
         }
         Spacer(modifier = Modifier.height(10.dp))
-        CardSection(title = "YOUR DAILY PLANS (DO THESE NOW)") {
+        SmoothCardSection(title = "YOUR DAILY PLANS (DO THESE NOW)") {
             plans.forEach { p ->
                 Text(
                     text = "${if (p.completed) "[DONE]" else "[TODO]"} ${p.title}",
-                    color = if (p.completed) Color(0xFF94A3B8) else Color(0xFF86EFAC),
+                    color = if (p.completed) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                     fontSize = 13.sp,
                     modifier = Modifier.padding(vertical = 3.dp)
                 )
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
-        CardSection(title = "ADVICE OF THE DAY") {
-            Text(callout.adviceOfTheDay, color = Color(0xFFBAE6FD), fontSize = 13.sp)
+        SmoothCardSection(title = "ADVICE OF THE DAY") {
+            Text(callout.adviceOfTheDay, color = MaterialTheme.colorScheme.tertiary, fontSize = 13.sp)
         }
         Spacer(modifier = Modifier.height(18.dp))
         Button(
             onClick = onOpenIgDirectOnly,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Open Instagram Direct Messages Only", color = Color.Black, fontWeight = FontWeight.Bold)
+            Text("Open Instagram Direct Messages Only", color = MaterialTheme.colorScheme.onSecondary, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(8.dp))
         Button(
             onClick = onReturnToDashboard,
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8)),
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Return to ZEROFEED Home & Read / Solve Problems", color = Color.Black, fontWeight = FontWeight.Bold)
+            Text("Return to ZEROFEED Home & Read / Solve Problems", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -622,153 +935,204 @@ fun HomeDashboardTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(18.dp)
     ) {
-        Text(
-            text = "ZEROFEED v2.0 // GALAXY S23 ULTRA",
-            color = Color(0xFF38BDF8),
-            fontSize = 18.sp,
-            fontWeight = FontWeight.ExtraBold
-        )
-        Text(
-            text = "In-App Guard: Quits Reels/Shorts & hides Home Feed inside Instagram and YouTube while keeping DMs & Search.",
-            color = Color(0xFF94A3B8),
-            fontSize = 12.sp
-        )
-        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column {
+                Text(
+                    text = "ZEROFEED v2.0",
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold
+                )
+                Text(
+                    text = "Galaxy S23 Ultra · Material You Theme",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 12.sp
+                )
+            }
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shape = CircleShape
+            ) {
+                Text(
+                    text = "SHIELD ACTIVE",
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                )
+            }
+        }
 
-        // Live Permission Status Banner (Prompts immediately if missing!)
-        CardSection(title = "IN-APP REEL/SHORT BLOCKER PERMISSIONS") {
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Live Permission Status Banner
+        SmoothCardSection(title = "IN-APP PERMISSION STATUS") {
             val allGranted = accessibilityEnabled && overlayGranted
             Text(
-                text = if (allGranted) {
-                    "✓ ALL PERMISSIONS ACTIVE — Native Instagram & YouTube are actively guarded!"
-                } else {
-                    "⚠ PERMISSION REQUIRED — Enable Accessibility & Overlay below so ZEROFEED can close Reels/Shorts and hide feeds:"
-                },
-                color = if (allGranted) Color(0xFF86EFAC) else Color(0xFFFCA5A5),
-                fontSize = 13.sp,
+                text = if (allGranted) "✓ ALL PERMISSIONS ACTIVE — Reels & Shorts are actively guarded!" else "⚠ ACTION NEEDED — Grant permissions to close Reels/Shorts:",
+                color = if (allGranted) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.error,
+                fontSize = 12.5.sp,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = "• Accessibility Guard (Quits Reels/Shorts): ${if (accessibilityEnabled) "ENABLED ✓" else "DISABLED ✗"}\n" +
-                    "• Appear on Top Overlay (Hides Home Feed): ${if (overlayGranted) "GRANTED ✓" else "MISSING ✗"}",
-                color = Color(0xFFCBD5E1),
-                fontSize = 12.sp
-            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    color = if (accessibilityEnabled) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer,
+                    shape = CircleShape
+                ) {
+                    Text(
+                        text = if (accessibilityEnabled) "Accessibility: ✓" else "Accessibility: ✗",
+                        color = if (accessibilityEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+                Surface(
+                    color = if (overlayGranted) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.errorContainer,
+                    shape = CircleShape
+                ) {
+                    Text(
+                        text = if (overlayGranted) "Appear on Top: ✓" else "Appear on Top: ✗",
+                        color = if (overlayGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = onOpenPermissionSetup,
+                shape = CircleShape,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (allGranted) Color(0xFF1E293B) else Color(0xFFEF4444)
+                    containerColor = if (allGranted) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.error
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    if (allGranted) "Review Permission Diagnostics" else "Grant Permissions Now (Required to Block Reels/Shorts)",
-                    color = Color.White,
+                    if (allGranted) "Review Permission Setup" else "Grant Missing Permissions Now",
+                    color = if (allGranted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onError,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.5.sp
+                    fontSize = 12.sp
                 )
             }
         }
+
         Spacer(modifier = Modifier.height(12.dp))
 
-        // GitHub Release Auto-Updater Card
-        CardSection(title = "GITHUB RELEASE AUTO-UPDATER") {
+        // GitHub Release Auto-Updater
+        SmoothCardSection(title = "GITHUB RELEASE AUTO-UPDATER") {
             Text(
                 text = updateStatusText,
-                color = if (updateInfo?.isNewerAvailable == true) Color(0xFF86EFAC) else Color(0xFFBAE6FD),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.Medium
             )
             if (downloadProgress in 0..100) {
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
                     progress = { downloadProgress / 100f },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Color(0xFF38BDF8)
+                    modifier = Modifier.fillMaxWidth().clip(CircleShape),
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 OutlinedButton(
                     onClick = onCheckUpdates,
+                    shape = CircleShape,
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Check GitHub", color = Color(0xFF38BDF8), fontSize = 12.sp)
+                    Text("Check GitHub", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = onInstallUpdate,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF22C55E)),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        if (updateInfo?.isNewerAvailable == true) "Install Update (${updateInfo.latestTag})" else "Download & Install Latest APK",
-                        color = Color.Black,
+                        if (updateInfo?.isNewerAvailable == true) "Install ${updateInfo.latestTag}" else "Install Latest APK",
+                        color = MaterialTheme.colorScheme.onSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 11.5.sp
                     )
                 }
             }
         }
+
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Quick Launchers for Clean Instagram & Clean YouTube
-        CardSection(title = "CLEAN APPS (ORIGINAL LOOK — BAD PARTS STRIPPED)") {
+        // Quick Launchers
+        SmoothCardSection(title = "CLEAN APPS (FEED & SHORTS REMOVED)") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
                     onClick = onOpenCleanInstagram,
+                    shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE1306C)),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Instagram (DMs Only)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Instagram DMs", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
                 Button(
                     onClick = onOpenCleanYouTube,
+                    shape = CircleShape,
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF0000)),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("YouTube (Search Only)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("YouTube Study", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
+
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Streak & Deflected Count
-        CardSection(title = "CLEAN FOCUS STREAK (PROTECTED BY SHIELD)") {
+        // Clean Streak Card
+        SmoothCardSection(title = "CLEAN FOCUS STREAK (STAYS INTACT)") {
             Text(
                 text = "$streakDays ${if (streakDays == 1) "Day" else "Days"} Clean Streak",
-                color = Color(0xFF86EFAC),
+                color = MaterialTheme.colorScheme.secondary,
                 fontSize = 28.sp,
                 fontWeight = FontWeight.ExtraBold
             )
             Text(
-                text = "Reels/Shorts Stopped Today: $todayDeflected (Total Stopped: $totalDeflected) — Streak stays intact when ZEROFEED stops you!",
-                color = Color(0xFF38BDF8),
+                text = "Reels/Shorts Stopped Today: $todayDeflected (Total: $totalDeflected) — Your streak never resets when stopped!",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp
             )
         }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         // Advice of the Day
-        CardSection(title = "ADVICE OF THE DAY") {
-            Text(advice, color = Color(0xFFE2E8F0), fontSize = 13.5.sp, lineHeight = 19.sp)
+        SmoothCardSection(title = "ADVICE OF THE DAY") {
+            Text(advice, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.5.sp, lineHeight = 20.sp)
             Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(onClick = onNextAdvice) {
-                Text("Cycle Next Advice", color = Color(0xFF38BDF8), fontSize = 12.sp)
+            OutlinedButton(
+                onClick = onNextAdvice,
+                shape = CircleShape
+            ) {
+                Text("Cycle Next Advice", color = MaterialTheme.colorScheme.primary, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
+
         Spacer(modifier = Modifier.height(12.dp))
 
         // Daily Plans
-        CardSection(title = "DAILY PLANS (READ A BOOK & SOLVE PROBLEMS)") {
+        SmoothCardSection(title = "DAILY PLANS (READ A BOOK & SOLVE PROBLEMS)") {
             plans.forEachIndexed { idx, plan ->
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
                 ) {
                     Checkbox(
                         checked = plan.completed,
@@ -776,7 +1140,7 @@ fun HomeDashboardTab(
                     )
                     Text(
                         text = plan.title,
-                        color = if (plan.completed) Color(0xFF64748B) else Color.White,
+                        color = if (plan.completed) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f) else MaterialTheme.colorScheme.onSurface,
                         fontSize = 13.sp
                     )
                 }
@@ -786,35 +1150,46 @@ fun HomeDashboardTab(
                 OutlinedTextField(
                     value = newPlanText,
                     onValueChange = { newPlanText = it },
-                    placeholder = { Text("Add plan (e.g. Solve 2 graph problems)", fontSize = 12.sp) },
+                    placeholder = { Text("Add daily task (e.g. Read 25 pages)", fontSize = 12.sp) },
+                    shape = RoundedCornerShape(20.dp),
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    if (newPlanText.isNotBlank()) {
-                        onAddPlan(newPlanText.trim())
-                        newPlanText = ""
-                    }
-                }) {
-                    Text("Add")
+                Button(
+                    onClick = {
+                        if (newPlanText.isNotBlank()) {
+                            onAddPlan(newPlanText.trim())
+                            newPlanText = ""
+                        }
+                    },
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Add", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
                 }
             }
         }
+
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Strict Mode & Callout Preview
-        CardSection(title = "STRICT MODE & ACCOUNTABILITY TEST") {
+        // Strict Mode Card
+        SmoothCardSection(title = "STRICT MODE & ACCOUNTABILITY") {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEngageStrictLock, modifier = Modifier.weight(1f)) {
-                    Text(if (strictLocked) "Strict Mode Locked" else "Lock Strict Mode (2h)", fontSize = 12.sp)
+                OutlinedButton(
+                    onClick = onEngageStrictLock,
+                    shape = CircleShape,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(if (strictLocked) "Locked (2h)" else "Lock Strict Mode", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
                 Button(
                     onClick = onSimulateReelAttempt,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB91C1C)),
+                    shape = CircleShape,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Preview Callout", color = Color.White, fontSize = 12.sp)
+                    Text("Preview Callout", color = MaterialTheme.colorScheme.onError, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -830,34 +1205,38 @@ fun RulesAndDiagnosticsTab(repo: ZeroFeedRepository, strictLocked: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(18.dp)
     ) {
-        CardSection(title = "INTERACTIVE URL RULE TESTER") {
+        SmoothCardSection(title = "INTERACTIVE URL RULE TESTER") {
             OutlinedTextField(
                 value = testUrl,
                 onValueChange = { testUrl = it },
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Button(onClick = {
-                val v = ZeroFeedRuleEngine.evaluateUrl(testUrl)
-                testResult = "Action: ${v.action} | Platform: ${v.platformId} | Type: ${v.violationType}\nReason: ${v.reason}"
-            }) {
-                Text("Evaluate URL")
+            Button(
+                onClick = {
+                    val v = ZeroFeedRuleEngine.evaluateUrl(testUrl)
+                    testResult = "Action: ${v.action} | Platform: ${v.platformId} | Type: ${v.violationType}\nReason: ${v.reason}"
+                },
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text("Evaluate URL", color = MaterialTheme.colorScheme.onPrimary, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(testResult, color = Color(0xFFBAE6FD), fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+            Text(testResult, color = MaterialTheme.colorScheme.tertiary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
         }
 
         Spacer(modifier = Modifier.height(14.dp))
-        CardSection(title = "FULL-APP BLOCKS (INSTAGRAM & YOUTUBE ARE FILTERED IN-APP INSTEAD)") {
+        SmoothCardSection(title = "BLOCKED ANDROID APPS") {
             val apps = listOf(
-                "com.zhiliaoapp.musically" to "TikTok Native App (Full Block)",
-                "com.snapchat.android" to "Snapchat Native App",
-                "com.reddit.frontpage" to "Reddit Native App",
-                "com.twitter.android" to "X / Twitter Native App"
+                "com.zhiliaoapp.musically" to "TikTok Native App",
+                "com.snapchat.android" to "Snapchat Native App"
             )
             apps.forEach { (pkg, label) ->
                 val isBlocked = blockedSet.contains(pkg)
@@ -866,7 +1245,7 @@ fun RulesAndDiagnosticsTab(repo: ZeroFeedRepository, strictLocked: Boolean) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
-                    Text(label, color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                    Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     Switch(
                         checked = isBlocked,
                         enabled = !(strictLocked && isBlocked),
@@ -882,21 +1261,24 @@ fun RulesAndDiagnosticsTab(repo: ZeroFeedRepository, strictLocked: Boolean) {
 }
 
 @Composable
-fun CardSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF111724), RoundedCornerShape(12.dp))
-            .border(1.dp, Color(0xFF243048), RoundedCornerShape(12.dp))
-            .padding(16.dp)
+fun SmoothCardSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(26.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 3.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f)),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Text(
-            text = title,
-            color = Color(0xFF38BDF8),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        content()
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            content()
+        }
     }
 }
