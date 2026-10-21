@@ -92,10 +92,11 @@ class ZeroFeedAccessibilityService : AccessibilityService() {
         // C. If user is on the Instagram Main Home Feed:
         //    First try to auto-click the Direct Messages icon so Instagram opens straight to DMs!
         val now = System.currentTimeMillis()
-        if (state.dmButtonNode != null && now - lastAutoClickDmEpochMs > 2500L) {
+        val dmBtn = state.dmButtonNode
+        if (dmBtn != null && now - lastAutoClickDmEpochMs > 2500L) {
             lastAutoClickDmEpochMs = now
             hideFeedShieldOverlay()
-            state.dmButtonNode.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            dmBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)
             return
         }
 
