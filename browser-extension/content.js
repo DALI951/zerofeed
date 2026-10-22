@@ -20,65 +20,23 @@
       .join("\n");
 
     const playlistPreserveRules = `
-/* Explicit ZEROFEED protection: Never hide playlist panels or playlist queue items */
-/* Expand Playlist & Mix panels to the whole available length since there is no feed video */
+/* Explicit ZEROFEED protection: Preserve normal native YouTube playlist and mix panels */
 ytd-playlist-panel-renderer,
 #playlist,
 #playlist.ytd-watch-flexy,
-#playlist.ytd-watch-grid {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-  max-height: none !important;
-  height: calc(100vh - 72px) !important;
-  min-height: calc(100vh - 100px) !important;
-  box-sizing: border-box !important;
-}
-
-ytd-playlist-panel-renderer #container,
-ytd-playlist-panel-renderer #container.ytd-playlist-panel-renderer {
-  max-height: none !important;
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-ytd-playlist-panel-renderer #items,
-ytd-playlist-panel-renderer #items.ytd-playlist-panel-renderer {
-  max-height: calc(100vh - 160px) !important;
-  height: 100% !important;
-  flex: 1 1 auto !important;
-  overflow-y: auto !important;
-}
-
-#secondary-inner.ytd-watch-flexy,
-#secondary.ytd-watch-flexy {
-  position: sticky !important;
-  top: 64px !important;
-  height: calc(100vh - 72px) !important;
-}
-
-ytd-playlist-panel-renderer[collapsed] #items {
-  display: block !important;
-}
-
+#playlist.ytd-watch-grid,
 ytm-playlist-panel-renderer,
 ytm-playlist,
 ytm-playlist-panel-video-renderer {
-  display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
-  max-height: none !important;
-  height: auto !important;
 }
 
 ytd-playlist-panel-video-renderer #primary-header,
 ytd-playlist-panel-video-renderer #meta,
 ytd-playlist-panel-video-renderer #thumbnail {
   visibility: visible !important;
-  display: flex !important;
 }
 
 /* ZEROFEED Badge removed so it does not distract while watching */
@@ -125,29 +83,32 @@ ytd-playlist-panel-video-renderer #thumbnail {
         container.style.setProperty("display", "none", "important");
       }
 
-      // Hide suggested/related videos when watching a video while strictly preserving playlists
+      // Hide suggested/related videos when watching a video while strictly preserving normal playlists
       if (window.location.pathname.includes("/watch") || window.location.href.includes("watch?v=")) {
-        // 1. Keep playlist & mix panel expanded to full length since there are no feed videos
+        // 1. Ensure playlist & mix panel remains visible in its normal, native vertical layout
         const playlistPanels = document.querySelectorAll("ytd-playlist-panel-renderer, #playlist, ytm-playlist-panel-renderer");
         for (const panel of playlistPanels) {
-          panel.style.setProperty("display", "flex", "important");
+          panel.style.removeProperty("max-height");
+          panel.style.removeProperty("height");
+          panel.style.removeProperty("min-height");
+          panel.style.removeProperty("display");
           panel.style.setProperty("visibility", "visible", "important");
           panel.style.setProperty("opacity", "1", "important");
           panel.style.setProperty("pointer-events", "auto", "important");
-          panel.style.setProperty("max-height", "none", "important");
-          panel.style.setProperty("height", "calc(100vh - 72px)", "important");
 
           const container = panel.querySelector("#container");
           if (container) {
-            container.style.setProperty("max-height", "none", "important");
-            container.style.setProperty("height", "100%", "important");
+            container.style.removeProperty("max-height");
+            container.style.removeProperty("height");
+            container.style.removeProperty("display");
+            container.style.removeProperty("flex-direction");
           }
 
           const items = panel.querySelector("#items");
           if (items) {
-            items.style.setProperty("max-height", "calc(100vh - 160px)", "important");
-            items.style.setProperty("height", "100%", "important");
-            items.style.setProperty("overflow-y", "auto", "important");
+            items.style.removeProperty("max-height");
+            items.style.removeProperty("height");
+            items.style.removeProperty("flex");
           }
         }
 

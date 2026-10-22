@@ -766,7 +766,6 @@ fun YouTubeCleanSearchScreen(
                                     visibility: hidden !important;
                                 }
                                 ytd-playlist-panel-renderer, #playlist, ytm-playlist-panel-renderer {
-                                    display: flex !important;
                                     visibility: visible !important;
                                 }
                                 body, html { background-color: #0f0f0f !important; }

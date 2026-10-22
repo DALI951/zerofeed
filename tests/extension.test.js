@@ -33,12 +33,12 @@ test("11. Browser extension Manifest V3 integrity & required files exist", () =>
   }
 });
 
-test("13. Browser extension content script hides watch-page suggested videos while preserving playlist panels", () => {
+test("13. Browser extension content script hides watch-page suggested videos while preserving playlist panels in normal layout", () => {
   const contentJs = fs.readFileSync(path.join(extDir, "content.js"), "utf8");
   assert.ok(contentJs.includes("ytd-playlist-panel-renderer"), "content.js must protect ytd-playlist-panel-renderer");
   assert.ok(contentJs.includes("playlistPreserveRules"), "content.js must have explicit playlistPreserveRules");
-  assert.ok(contentJs.includes("display: flex !important"), "content.js must enforce playlist visibility with flex !important");
-  assert.ok(contentJs.includes("calc(100vh - 72px)"), "content.js must expand playlist and mix panels to full height");
+  assert.ok(contentJs.includes("visibility: visible !important"), "content.js must ensure playlist visibility");
+  assert.ok(!contentJs.includes("calc(100vh - 72px)"), "content.js must not overstretch or distort playlist panel layout");
   assert.ok(contentJs.includes("removeShieldBadge"), "content.js must remove intrusive floating shield badge");
 
   const rules = JSON.parse(fs.readFileSync(path.join(extDir, "common", "default-rules.json"), "utf8"));
