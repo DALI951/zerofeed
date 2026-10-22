@@ -755,9 +755,19 @@ fun YouTubeCleanSearchScreen(
                                 ytm-shorts-lockup-view-model, a[href^='/shorts'], a[href*='/shorts/'],
                                 ytm-pivot-bar-item-renderer:has(div.pivot-shorts),
                                 ytm-pivot-bar-item-renderer:nth-child(2),
-                                ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch'] {
+                                ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch'],
+                                #related:not(:has(ytd-playlist-panel-renderer)),
+                                ytd-watch-next-secondary-results-renderer:not(:has(ytd-playlist-panel-renderer)),
+                                ytm-item-section-renderer[section-identifier='related-items'],
+                                ytm-single-column-watch-next-results-renderer > .related-items,
+                                ytm-watch-next-feed,
+                                .ytp-ce-element, .ytp-endscreen-content {
                                     display: none !important;
                                     visibility: hidden !important;
+                                }
+                                ytd-playlist-panel-renderer, #playlist, ytm-playlist-panel-renderer {
+                                    display: flex !important;
+                                    visibility: visible !important;
                                 }
                                 body, html { background-color: #0f0f0f !important; }
                             """.trimIndent()

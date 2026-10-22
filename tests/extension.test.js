@@ -32,3 +32,16 @@ test("11. Browser extension Manifest V3 integrity & required files exist", () =>
     assert.ok(fs.existsSync(full), `Missing required extension file: ${rel}`);
   }
 });
+
+test("13. Browser extension content script hides watch-page suggested videos while preserving playlist panels", () => {
+  const contentJs = fs.readFileSync(path.join(extDir, "content.js"), "utf8");
+  assert.ok(contentJs.includes("ytd-playlist-panel-renderer"), "content.js must protect ytd-playlist-panel-renderer");
+  assert.ok(contentJs.includes("playlistPreserveRules"), "content.js must have explicit playlistPreserveRules");
+  assert.ok(contentJs.includes("display: flex !important"), "content.js must enforce playlist visibility with flex !important");
+
+  const rules = JSON.parse(fs.readFileSync(path.join(extDir, "common", "default-rules.json"), "utf8"));
+  const ytSelectors = rules.platforms.youtube.hideSelectors;
+  assert.ok(ytSelectors.includes("#related:not(:has(ytd-playlist-panel-renderer))"));
+  assert.ok(ytSelectors.includes("ytd-watch-next-secondary-results-renderer:not(:has(ytd-playlist-panel-renderer))"));
+  assert.ok(ytSelectors.includes(".ytp-ce-element"));
+});

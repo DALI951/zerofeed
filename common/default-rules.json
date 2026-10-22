@@ -152,7 +152,18 @@
         "ytm-browse div.tab-content[tab-identifier='FEwhat_to_watch']",
         ".ytp-autonav-toggle-button-container",
         "ytd-compact-autoplay-renderer",
-        "#related ytd-reel-shelf-renderer"
+        "#related:not(:has(ytd-playlist-panel-renderer))",
+        "ytd-watch-next-secondary-results-renderer:not(:has(ytd-playlist-panel-renderer))",
+        "#items.ytd-watch-next-secondary-results-renderer",
+        "ytd-compact-video-renderer:not(ytd-playlist-panel-renderer ytd-compact-video-renderer)",
+        "ytd-compact-radio-renderer",
+        "ytd-playlist-panel-renderer ytd-playlist-panel-video-renderer:has([style*='playlist-video-renderer-style-recommended-video'])",
+        ".ytp-ce-element",
+        ".ytp-endscreen-content",
+        "ytm-item-section-renderer[section-identifier='related-items']",
+        "ytm-single-column-watch-next-results-renderer > .related-items",
+        "ytm-watch-next-feed",
+        "ytm-compact-video-renderer:not(ytm-playlist-panel-renderer ytm-compact-video-renderer)"
       ],
       "androidPackage": "com.google.android.youtube",
       "androidPolicy": "block_shorts_and_home"

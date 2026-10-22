@@ -52,6 +52,16 @@ test("4. Allowed educational YouTube video and search query with Shorts DOM sele
   assert.equal(watchEval.action, "ALLOW");
   assert.equal(watchEval.platformId, "youtube");
   assert.ok(watchEval.hideSelectors.includes("ytd-reel-shelf-renderer"));
+  // Assert suggested videos on watch page are targeted for hiding
+  assert.ok(watchEval.hideSelectors.includes("#related:not(:has(ytd-playlist-panel-renderer))"));
+  assert.ok(watchEval.hideSelectors.includes("ytd-watch-next-secondary-results-renderer:not(:has(ytd-playlist-panel-renderer))"));
+
+  const playlistWatchEval = engine.evaluateUrl(
+    "https://www.youtube.com/watch?v=8hly31xKli0&list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf",
+    cfg
+  );
+  assert.equal(playlistWatchEval.action, "ALLOW");
+  assert.equal(playlistWatchEval.platformId, "youtube");
 
   const searchEval = engine.evaluateUrl(
     "https://www.youtube.com/results?search_query=dynamic+programming+lecture+mit",
